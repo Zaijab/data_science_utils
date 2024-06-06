@@ -1,0 +1,57 @@
+#+TITLE: Model Evaluation
+#+AUTHOR: Zain Jabbar
+#+PROPERTY: header-args:jupyter-python :session classifier :pandoc t :async yes :dir ~/code/data_science_utils/
+
+
+* Intro
+
+#+BEGIN_SRC jupyter-python
+import classifiers
+classifiers.my_variable
+#+END_SRC
+
+#+RESULTS:
+: 10
+
+#+BEGIN_SRC jupyter-python
+from datasets.compas import download_compas_fal
+
+download_compas_fal
+#+END_SRC
+
+#+RESULTS:
+: <function datasets.compas.download_compas_fal(path='https://raw.githubusercontent.com/anahideh/FAL--Fair-Active-Learning/master/FAL/RecidivismData_Normalized.csv', attributes=['MarriageStatus', 'age', 'juv_fel_count', 'juv_misd_count', 'juv_other_count', 'priors_count', 'days_b_screening_arrest', 'c_days_from_compas', 'c_charge_degree'], response_column='two_year_recid', sensitive_attribute='race')>
+
+* Usage
+
+#+BEGIN_SRC jupyter-python :results none
+%load_ext autoreload
+%autoreload 2
+#+END_SRC
+
+
+#+BEGIN_SRC jupyter-python
+from datasets.compas import download_compas
+from model_evaluation.classifiers import *
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import get_scorer_names
+from sklearn.metrics import get_scorer
+
+X_train, y_train, labelled_index, X_test, y_test = download_compas(active_learning=True)
+estimator = LogisticRegression(max_iter=10**5).fit(X_train, y_train)
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC jupyter-python
+from model_evaluation.classifiers import score_estimators
+
+score_estimators([estimator, estimator], [accuracy_score, accuracy_score])
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+| LogisticRegression(max_iter=100000) | <function accuracy_score at 0x7fb034e2b1c0> |
+|                                     | <function accuracy_score at 0x7fb034e2b1c0> |
+:END:

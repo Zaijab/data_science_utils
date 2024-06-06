@@ -1,0 +1,198 @@
+#+TITLE: Fair Active Learning Experiments
+#+AUTHOR: Zain Jabbar
+#+SETUPFILE: ~/notes/latex_header.org
+#+PROPERTY: header-args:jupyter-python :session fair_active_learning_test :pandoc t :async yes :dir /home/zjabbar/code/data_science_utils/
+
+#+BEGIN_SRC jupyter-python :results none
+%load_ext autoreload
+%autoreload 2
+#+END_SRC
+
+* Evaluation
+
+#+BEGIN_SRC jupyter-python
+import matplotlib.pyplot as plt
+from fair_active_learning.active_learning import list_loc
+
+for X_train, y_train, labelled_index, X_test, y_test in [download_compas(active_learning=True)]:
+    for estimator_name, estimator in {'Logistic Regression' : LogisticRegression(max_iter=1000)}.items():
+        estimator.fit(X_train, y_train)
+        for standard_scorer_name, standard_scorer in standard_scorers.items():
+            print(standard_scorer_name, standard_scorer(estimator, X_test, y_test))
+
+#+END_SRC
+
+#+RESULTS:
+: Accuracy 0.683599419448476
+: Precision 0.6777996070726916
+: Recall 0.5591572123176661
+: F1 0.6127886323268206
+: AUROC 0.7409916577394327
+
+* Active Learning
+
+#+BEGIN_SRC jupyter-python
+from pipelines.fair_active_pipeline import active_learning_pipeline
+
+len(active_learning_pipeline["datasets"]["COMPAS"](active_learning=True))
+
+for dataset_name, dataset_downloader in active_learning_pipeline["datasets"].items():
+    X_train, y_train, labelled_pool, X_test, y_test = dataset_downloader(active_learning=True)
+
+    for active_learning_approach_name, active_learning_approach_callable in active_learning_pipeline["active_learning"]:
+        
+
+#+END_SRC
+
+#+RESULTS:
+
+
+
+#+BEGIN_SRC jupyter-python
+from pipelines.fair_active_pipeline import active_learning_pipeline
+def list_loc(df, index_list):
+    return df.loc[df.index.isin(index_list)]
+
+len(active_learning_pipeline["datasets"]["COMPAS"](active_learning=True))
+
+for dataset_name, dataset_downloader in active_learning_pipeline["datasets"].items():
+    X_train, y_train, labelled_pool, X_test, y_test = dataset_downloader(active_learning=True)
+
+    for estimator_name, estimator in active_learning_pipeline["models"].items():
+        estimator.fit(list_loc(X_train, labelled_pool), list_loc(y_train, labelled_pool))
+        
+        for active_learning_approach_name, active_learning_approach_callable in active_learning_pipeline["active_learning"].items():
+            active_learning_approach_callable(estimator, X_train, y_train, labelled_pool, 100)
+            break
+        break
+    break
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# [goto error]
+#+begin_example
+---------------------------------------------------------------------------
+KeyError                                  Traceback (most recent call last)
+Cell In [28], line 14
+     11 estimator.fit(list_loc(X_train, labelled_pool), list_loc(y_train, labelled_pool))
+     13 for active_learning_approach_name, active_learning_approach_callable in active_learning_pipeline["active_learning"].items():
+---> 14     active_learning_approach_callable(estimator, X_train, y_train, labelled_pool, 100)
+     15     break
+     16 break
+
+File ~/code/data_science_utils/fair_active_learning/active_learning.py:31, in active_learning(model, X, y, labelled_pool, budget)
+     25     entropy = (
+     26         -unlabelled_prediction_proba * np.log2(unlabelled_prediction_proba)
+     27     ).sum(axis=1)
+     28     labelled_pool = labelled_pool.append(
+     29         X.iloc[entropy.argmax()].to_frame().T.index
+     30     )
+---> 31     model.fit(X.loc[labelled_pool], y.loc[labelled_pool])
+     32     yield model, labelled_pool
+     34 return labelled_pool
+
+File /gnu/store/4a0p0fi3wcjyqdmzx9dpbamnqm0jbqbr-profile/lib/python3.10/site-packages/pandas/core/indexing.py:1153, in _LocationIndexer.__getitem__(self, key)
+   1150 axis = self.axis or 0
+   1152 maybe_callable = com.apply_if_callable(key, self.obj)
+-> 1153 return self._getitem_axis(maybe_callable, axis=axis)
+
+File /gnu/store/4a0p0fi3wcjyqdmzx9dpbamnqm0jbqbr-profile/lib/python3.10/site-packages/pandas/core/indexing.py:1393, in _LocIndexer._getitem_axis(self, key, axis)
+   1391 # fall thru to straight lookup
+   1392 self._validate_key(key, axis)
+-> 1393 return self._get_label(key, axis=axis)
+
+File /gnu/store/4a0p0fi3wcjyqdmzx9dpbamnqm0jbqbr-profile/lib/python3.10/site-packages/pandas/core/indexing.py:1343, in _LocIndexer._get_label(self, label, axis)
+   1341 def _get_label(self, label, axis: AxisInt):
+   1342     # GH#5567 this will fail if the label is not present in the axis.
+-> 1343     return self.obj.xs(label, axis=axis)
+
+File /gnu/store/4a0p0fi3wcjyqdmzx9dpbamnqm0jbqbr-profile/lib/python3.10/site-packages/pandas/core/generic.py:4228, in NDFrame.xs(self, key, axis, level, drop_level)
+   4225     index = self.index
+   4227 if isinstance(index, MultiIndex):
+-> 4228     loc, new_index = index._get_loc_level(key, level=0)
+   4229     if not drop_level:
+   4230         if lib.is_integer(loc):
+   4231             # Slice index must be an integer or None
+
+File /gnu/store/4a0p0fi3wcjyqdmzx9dpbamnqm0jbqbr-profile/lib/python3.10/site-packages/pandas/core/indexes/multi.py:3175, in MultiIndex._get_loc_level(self, key, level)
+   3173         return indexer, maybe_mi_droplevels(indexer, ilevels)
+   3174 else:
+-> 3175     indexer = self._get_level_indexer(key, level=level)
+   3176     if (
+   3177         isinstance(key, str)
+   3178         and self.levels[level]._supports_partial_string_indexing
+   3179     ):
+   3180         # check to see if we did an exact lookup vs sliced
+   3181         check = self.levels[level].get_loc(key)
+
+File /gnu/store/4a0p0fi3wcjyqdmzx9dpbamnqm0jbqbr-profile/lib/python3.10/site-packages/pandas/core/indexes/multi.py:3289, in MultiIndex._get_level_indexer(self, key, level, indexer)
+   3285     locs = np.array(level_codes == idx, dtype=bool, copy=False)
+   3287     if not locs.any():
+   3288         # The label is present in self.levels[level] but unused:
+-> 3289         raise KeyError(key)
+   3290     return locs
+   3292 if isinstance(idx, slice):
+   3293     # e.g. test_partial_string_timestamp_multiindex
+
+KeyError: None
+#+end_example
+:END:
+
+#+BEGIN_SRC jupyter-python
+
+#labelled_pool
+
+list_loc(X_train, labelled_pool)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+|      |      | MarriageStatus | age | juv_fel_count | juv_misd_count | juv_other_count | priors_count | days_b_screening_arrest | c_days_from_compas | c_charge_degree |
+|------+------+----------------+-----+---------------+----------------+-----------------+--------------+-------------------------+--------------------+-----------------|
+| UID  | race |                |     |               |                |                 |              |                         |                    |                 |
+| 5829 | 1    | 2              | 47  | 0.0           | 0.0            | 0.000000        | 0.000000     | 0.280761                | 0.000105           | 1               |
+| 2668 | 3    | 2              | 47  | 0.0           | 0.0            | 0.000000        | 0.052632     | 0.264446                | 0.002636           | 0               |
+| 3066 | 1    | 5              | 35  | 0.0           | 0.0            | 0.000000        | 0.000000     | 0.280761                | 0.000105           | 0               |
+| 2171 | 3    | 3              | 46  | 0.0           | 0.0            | 0.000000        | 0.052632     | 0.462271                | 0.107222           | 0               |
+| 2004 | 2    | 1              | 37  | 0.0           | 0.0            | 0.000000        | 0.105263     | 0.281441                | 0.000000           | 1               |
+| ...  | ...  | ...            | ... | ...           | ...            | ...             | ...          | ...                     | ...                | ...             |
+| 2052 | 2    | 1              | 27  | 0.0           | 0.0            | 0.000000        | 0.078947     | 0.280761                | 0.000105           | 1               |
+| 3353 | 3    | 7              | 52  | 0.0           | 0.0            | 0.000000        | 0.210526     | 0.281441                | 0.000000           | 1               |
+| 6305 | 3    | 1              | 22  | 0.0           | 0.0            | 0.058824        | 0.000000     | 0.280761                | 0.000105           | 1               |
+| 5594 | 3    | 1              | 23  | 0.0           | 0.0            | 0.117647        | 0.026316     | 0.267845                | 0.002109           | 1               |
+| 138  | 2    | 1              | 33  | 0.0           | 0.0            | 0.000000        | 0.210526     | 0.280761                | 0.000105           | 0               |
+
+100 rows × 9 columns
+:END:
+
+* Test Active Learning
+
+#+BEGIN_SRC jupyter-python
+from df_utils import list_loc
+from datasets.binary_classification import download_compas
+from sklearn.linear_model import LogisticRegression
+from fair_active_learning.active_learning import active_learning
+from sklearn.metrics import accuracy_score
+
+X_train, y_train, labelled_index, X_test, y_test = download_compas(active_learning=True)
+
+estimator_name, estimator = 'Logistic Regression', LogisticRegression(max_iter=1000)
+estimator.fit(list_loc(X_train, labelled_index), list_loc(y_train, labelled_index))
+
+for new_estimator, new_labelled_pool in active_learning(estimator, X_train, y_train, labelled_index, 10):
+    print(accuracy_score(new_estimator.predict(X_test), y_test))
+#+END_SRC
+
+#+RESULTS:
+: 0.5972423802612482
+: 0.5986937590711175
+: 0.5979680696661829
+: 0.6008708272859217
+: 0.5986937590711175
+: 0.6037735849056604
+: 0.604499274310595
+: 0.6030478955007257
+: 0.6074020319303338
+: 0.6008708272859217
+

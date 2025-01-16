@@ -8,7 +8,7 @@ from functools import partial
 from jaxtyping import Float, Bool, Array, jaxtyped
 from beartype import beartype as typechecker
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import partial
 from typing import Callable
 
@@ -42,7 +42,8 @@ def generate(key, batch_size: int = 10**5, u: float = 0.9) -> Array:
 @dataclass
 class IkedaSystem:
     u: float = 0.9
-    state: Float[Array, "*batch 2"] = jnp.array([[1.25, 0]])
+    state: Float[Array, "*batch 2"] = field(default_factory=lambda: jnp.array([[1.25, 0]]))
+
 
     def __post_init__(self):
         self.flow: Callable[[Float[Array, "*batch 2"]], Float[Array, "*batch 2"]] = partial(flow, u=self.u)

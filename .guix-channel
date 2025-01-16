@@ -1,0 +1,24 @@
+(channel	
+ (version 0)
+ (dependencies
+  (channel
+   (name guix-science)
+   (url "https://codeberg.org/guix-science/guix-science.git")
+   (branch "master")
+   (commit "33add622caaa24efe8b0fa7274939d139e4f0d34")
+   (introduction
+    (channel-introduction
+     (version 0)
+     (commit "b1fe5aaff3ab48e798a4cce02f0212bc91f423dc")
+     (signer "CA4F 8CF4 37D7 478F DA05  5FD4 4213 7701 1A37 8446"))))
+  (channel
+   (name guix)
+   (url "https://git.savannah.gnu.org/git/guix.git")
+   (branch "master")
+   (commit "be5a8ee7a3ebe184a6e7bd8f7a82ea0b81046086")
+   (introduction
+    (channel-introduction
+     (version 0)
+     (commit "9edb3f66fd807b096b48283debdcddccfea34bad")
+     (signer "BBB0 2DDF 2CEA F6A8 0D1D  E643 A2A0 6DF2 A33A 54FA")))))
+ (directory ".guix/modules"))  ;look for package modules under .guix/modules/

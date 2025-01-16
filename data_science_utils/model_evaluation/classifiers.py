@@ -15,6 +15,14 @@ standard_scorers: Dict[str, Callable[[Model, Any, Any], float]] = {
     "AUROC": get_scorer("roc_auc"),
 }
 
+standard_scorers: Dict[str, Callable[[Model, Any, Any], float]] = {
+    "": get_scorer("accuracy"),
+    "Precision": get_scorer("precision"),
+    "Recall": get_scorer("recall"),
+    "F1": get_scorer("f1"),
+    "AUROC": get_scorer("roc_auc"),
+}
+
 
 def score_estimators(metrics, estimators, X, y):
     """"""

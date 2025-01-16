@@ -1,0 +1,11 @@
+This is a repository consisting of utility functions in the authors personal data science career. This README will give a high level overview of the modules involved which glues all aspects of the utility files together for the authors personal productivity.
+
+* Datasets
+
+A common way to compare models is to run a different model on a public, well-known datasets. Furthermore, some papers will go through the same preprocessing steps as each other. The datasets module will contain functions which download the datasets and perform certain preprocessing steps so that one may import the datasets easily.
+
+* Models
+
+* TODO 
+
+* TODO 

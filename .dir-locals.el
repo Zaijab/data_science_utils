@@ -1,0 +1,8 @@
+;; ((nil . ((python-shell-interpreter . "jupyter")
+;; 	 (python-shell-interpreter-args . "console --simple-prompt --kernel myenv")
+;; 	 (python-shell-completion-native-enable . nil)
+;;          (python-shell-prompt-detect-failure-warning . nil)
+;;          (python-shell-prompt-regexp . "In \\[[0-9]+\\]: ")
+;;          (python-shell-prompt-block-regexp . "\\.\\.\\.\\.: ")
+;;          (python-shell-prompt-output-regexp . "Out\\[[0-9]+\\]: ")
+;; 	 (bruh . "hi-zain"))))

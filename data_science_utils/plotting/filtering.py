@@ -17,7 +17,7 @@ if plot:
     key, subkey = jax.random.split(key)
     attractor = system.generate(subkey)
 
-ensemble_size = 100
+ensemble_size = 1000
 silverman_bandwidth = (4 / (ensemble_size * (2 + 2))) ** (2 / (2 + 4))
 
 key, subkey = jax.random.split(key)
@@ -30,9 +30,10 @@ filter = DEnGMF(
     measurement_device=measurement_device,
     bandwidth_factor=silverman_bandwidth,
     state=prior_ensemble,
+    ninverses=7,
 )
 
-burn_in_time = 10
+burn_in_time = 100
 measurement_time = 10 * burn_in_time
 debug = False
 covariances, states = [], []
@@ -41,9 +42,9 @@ for t in tqdm(range(burn_in_time + measurement_time), leave=False):
     prior_ensemble = filter.state
 
     key, subkey = jax.random.split(key)
+    # with jax.disable_jit():
     filter.update(subkey, measurement_device(system.state), debug=debug)
-
-
+        
     if plot:
         plt.scatter(attractor[:, 0], attractor[:, 1], c='blue', alpha=0.1, s=0.1)
         plt.scatter(prior_ensemble[:, 0], prior_ensemble[:, 1], alpha=0.8, s=10, c='purple', label='Prior')
@@ -81,6 +82,8 @@ if len(states) != 0:
 
     rmse = jnp.mean(jnp.sqrt((1 / (e.shape[1] * e.shape[2] * e.shape[3])) * jnp.sum(e * e, axis=(1, 2, 3))))
     snees = (1 / e.size) * jnp.sum(jnp.swapaxes(e, -2, -1) @ jnp.linalg.inv(P) @ e)
+
+    print(f'{str(type(filter)).split(".")[-1][:-2]}: Batch {filter.state.shape[0]} / Time {measurement_time}')
     print(f"RMSE: {rmse}")
     print(f"SNEES: {snees}")
 
@@ -92,3 +95,10 @@ if len(states) != 0:
 # DEnGMF 100
 # RMSE: 0.0859875482169743
 # SNEES: 0.2685743363547288
+
+# DEnGMF (Bypass 10%)
+# RMSE: 0.0696469824359378
+
+# EnGMF 1000 Batch / 5000 Measurement
+# RMSE: 0.06726956850487631
+# SNEES: 0.17278851467324655

@@ -7,6 +7,7 @@ import jax.scipy as jsp
 from beartype import beartype as typechecker
 from jax import lax
 from jaxtyping import Array, Bool, Float, Key, jaxtyped
+import equinox as eqx
 
 from data_science_utils.dynamical_systems import ikeda_attractor_discriminator
 
@@ -23,11 +24,12 @@ def sample_multivariate_normal(
     """
     return jax.random.multivariate_normal(rng, mean=mean, cov=cov)
 
-@partial(jax.jit, static_argnames=["ninverses"])
+#@partial(jax.jit, static_argnames=["ninverses"])
+@jax.jit
 def ikeda_attractor_discriminator(
     x: Float[Array, "state_dim"],
     ninverses: int = 10,
-    u: float = 0.9
+    u: float = 0.9,
 ) -> Bool[Array, ""]:
     """
     Returns True if 'x' lies on the Ikeda attractor, computed via ninverses
@@ -91,13 +93,15 @@ def ikeda_attractor_discriminator(
 # ---------------------------------------------------------------------
 # Single-sample Rejection: repeatedly draw until point passes discriminator
 # ---------------------------------------------------------------------
-@partial(jax.jit, static_argnames=["ninverses"])
+#@partial(jax.jit, static_argnames=["ninverses"])
+@jax.jit
 def rejection_sample_single(
     rng: jax.random.PRNGKey,
     mean: Float[Array, "state_dim"],
     cov: Float[Array, "state_dim state_dim"],
     ninverses: int = 10,
-    u: float = 0.9
+    u: float = 0.9,
+    bypass_prob: float = 0.0,
 ) -> Float[Array, "state_dim"]:
     """
     Samples from the multivariate normal defined by (mean, cov) until
@@ -109,25 +113,29 @@ def rejection_sample_single(
         # carry = (rng, candidate, accepted_bool)
         return ~carry[2]
 
+
     def body_fun(carry):
         rng, sample, accepted = carry
-        rng, subkey = jax.random.split(rng)
-        candidate = sample_multivariate_normal(subkey, mean, cov)
-        # If candidate passes, store it
+        rng, subkey_candidate, subkey_bypass = jax.random.split(rng, 3)
+        candidate = sample_multivariate_normal(subkey_candidate, mean, cov)
         pass_sample = ikeda_attractor_discriminator(candidate, ninverses, u)
+
+        random_bypass = jax.random.uniform(subkey_bypass) < bypass_prob
+        pass_sample = pass_sample | random_bypass
         sample = jnp.where(pass_sample, candidate, sample)
         accepted = accepted | pass_sample
         return (rng, sample, accepted)
 
     # Initialize with zero vector and False acceptance
     carry_init = (rng, jnp.zeros_like(mean), False)
-    _, final_sample, _ = lax.while_loop(cond_fun, body_fun, carry_init)
+    _, final_sample, _ = eqx.internal.while_loop(cond_fun, body_fun, carry_init, kind="checkpointed", max_steps=10**6)
     return final_sample
 
 # ---------------------------------------------------------------------
 # Batch Rejection: vmap across multiple means/covariances
 # ---------------------------------------------------------------------
-@partial(jax.jit, static_argnames=["ninverses"])
+#@partial(jax.jit, static_argnames=["ninverses"])
+@jax.jit
 def rejection_sample_batch(
     rng: jax.random.PRNGKey,
     means: Float[Array, "batch state_dim"],
@@ -191,6 +199,7 @@ def discriminator_ensemble_gaussian_mixture_filter_update_ensemble(
         key: Key[Array, ""],
         measurement: Float[Array, "measurement_dim"],
         measurement_device,
+        ninverses: int,
         debug: bool = False
 ):
     key: Key[Array, ""]
@@ -237,7 +246,7 @@ def discriminator_ensemble_gaussian_mixture_filter_update_ensemble(
     #     jax.debug.callback(has_nan, posterior_covariances)
 
     # posterior_samples = sample_multivariate_normal(subkeys, posterior_ensemble, posterior_covariances)
-    posterior_samples = rejection_sample_batch(rejection_sample_key, posterior_ensemble, posterior_covariances, ninverses=10, u=0.9)
+    posterior_samples = rejection_sample_batch(rejection_sample_key, posterior_ensemble, posterior_covariances, ninverses=ninverses, u=0.9)
     # if debug:
     #     assert isinstance(posterior_weights, Float[Array, "batch_dim"])
 
@@ -250,6 +259,7 @@ class DEnGMF:
     measurement_device: object
     state: Float[Array, "batch_dim state_dim"]
     bandwidth_factor: float
+    ninverses: int = 10
 
     def update(self, key, measurement, debug):
         self.covariences, self.state = discriminator_ensemble_gaussian_mixture_filter_update_ensemble(
@@ -258,6 +268,7 @@ class DEnGMF:
             measurement_device=self.measurement_device,
             key=key,
             measurement=measurement,
+            ninverses=self.ninverses,
             debug=debug
         )
 

@@ -69,7 +69,7 @@ class IkedaSystem:
 @partial(jax.jit, static_argnames=["u", "ninverses"])
 def ikeda_attractor_discriminator(
     x: Float[Array, "*batch 2"],
-    ninverses: int = 10,
+    ninverses: int = 7,
     u: float = 0.9
 ) -> Bool[Array, "*batch"]:
     """
@@ -146,7 +146,7 @@ y = jnp.linspace(-2.5, 1, grid_spacing)
 XX, YY = jnp.meshgrid(x, y)
 grid = jnp.dstack([XX, YY])
 grid_points = grid.reshape(-1, 2)
-labels = ikeda_attractor_discriminator(grid_points)
+labels = ikeda_attractor_discriminator(grid_points, ninverses=7)
 labels_grid = labels.reshape(grid_spacing, grid_spacing)
 
 plt.figure(figsize=(8, 6))

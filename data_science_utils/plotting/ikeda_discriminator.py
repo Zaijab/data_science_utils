@@ -1,3 +1,17 @@
+import jax
+import jax.numpy as jnp
+import matplotlib.pyplot as plt
+from data_science_utils.dynamical_systems import IkedaSystem, ikeda_attractor_discriminator
+
+# key = jax.random.key(0)
+# key, subkey = jax.random.split(key)
+# ikeda = IkedaSystem(state=jnp.array([[1.0, 2.0]]), u=0.9)
+# batch = ikeda.generate(subkey)
+# batch = ikeda.flow(batch)
+# ikeda.iterate()
+
+##############
+
 # Implement Ikeda Discriminator
 # Import NNX normalizing flow discriminator
 
@@ -110,7 +124,7 @@ def ikeda_attractor_discriminator(
 
             return zi_next, None
 
-        # Initialize with zn and do 8 Newton steps
+        # Initialize with zn and do 12 Newton steps
         zi_final, _ = lax.scan(newton_iteration, zn, None, length=8)
         return zi_final
 
@@ -122,3 +136,22 @@ def ikeda_attractor_discriminator(
     x_inv = apply_inverse_n_times(x)
     threshold = jnp.sqrt(1.0 / (1.0 - u))
     return jnp.linalg.norm(x_inv, axis=-1) < threshold
+
+
+##############
+
+grid_spacing = 1000
+x = jnp.linspace(-0.5, 2, grid_spacing)
+y = jnp.linspace(-2.5, 1, grid_spacing)
+XX, YY = jnp.meshgrid(x, y)
+grid = jnp.dstack([XX, YY])
+grid_points = grid.reshape(-1, 2)
+labels = ikeda_attractor_discriminator(grid_points)
+labels_grid = labels.reshape(grid_spacing, grid_spacing)
+
+plt.figure(figsize=(8, 6))
+plt.contourf(XX, YY, labels_grid)
+plt.title('Discriminator Output')
+plt.xlabel('x')
+plt.ylabel('y')
+plt.show()

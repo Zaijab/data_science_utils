@@ -22,7 +22,6 @@ silverman_bandwidth = (4 / (ensemble_size * (2 + 2))) ** (2 / (2 + 4))
 
 key, subkey = jax.random.split(key)
 prior_ensemble = jax.random.multivariate_normal(key=subkey, shape=(ensemble_size,), mean=system.state, cov=1/16 * jnp.eye(2))
-#prior_ensemble = jax.random.uniform(key=subkey, shape=(ensemble_size, 2), minval=-0.25, maxval=0.25)
 
 
 filter = EnGMF(
@@ -86,19 +85,3 @@ if len(states) != 0:
     print(f'{str(type(filter)).split(".")[-1][:-2]}: Batch {filter.state.shape[0]} / Time {measurement_time}')
     print(f"RMSE: {rmse}")
     print(f"SNEES: {snees}")
-
-
-# DEnGMF 10
-# RMSE: 0.13522035761087647
-# SNEES: 0.7933309550001773
-
-# DEnGMF 100
-# RMSE: 0.0859875482169743
-# SNEES: 0.2685743363547288
-
-# DEnGMF (Bypass 10%)
-# RMSE: 0.0696469824359378
-
-# EnGMF 1000 Batch / 5000 Measurement
-# RMSE: 0.06726956850487631
-# SNEES: 0.17278851467324655

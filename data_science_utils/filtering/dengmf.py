@@ -79,7 +79,7 @@ def ikeda_attractor_discriminator(
             )
             return zi_next, None
 
-        zi_final, _ = lax.scan(newton_iteration, zn, None, length=6)
+        zi_final, _ = lax.scan(newton_iteration, zn, None, length=10)
         return zi_final
 
     def body_fn(_, state):

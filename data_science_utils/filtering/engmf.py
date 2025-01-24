@@ -7,6 +7,7 @@ import jax.scipy as jsp
 from beartype import beartype as typechecker
 from jaxtyping import Array, Float, Key, jaxtyped
 
+import equinox as eqx
 
 @jaxtyped(typechecker=typechecker)
 @partial(jax.jit, static_argnames=["debug"])
@@ -15,6 +16,7 @@ def ensemble_gaussian_mixture_filter_update_point(
         prior_mixture_covariance: Float[Array, "state_dim state_dim"],
         measurement: Float[Array, "measurement_dim"],
         measurement_device: object,
+        measurement_device_covariance,
         debug: bool = False
 ):
     measurement_jacobian = jax.jacfwd(measurement_device)(point)
@@ -22,7 +24,7 @@ def ensemble_gaussian_mixture_filter_update_point(
         assert isinstance(measurement_jacobian, Float[Array, "measurement_dim state_dim"])
         jax.debug.callback(has_nan, measurement_jacobian)
 
-    kalman_gain = prior_mixture_covariance @ measurement_jacobian.T @ jnp.linalg.inv(measurement_jacobian @ prior_mixture_covariance @ measurement_jacobian.T + measurement_device.covariance)
+    kalman_gain = prior_mixture_covariance @ measurement_jacobian.T @ jnp.linalg.inv(measurement_jacobian @ prior_mixture_covariance @ measurement_jacobian.T + measurement_device_covariance)
     if debug:
         assert isinstance(kalman_gain, Float[Array, "state_dim measurement_dim"])
         jax.debug.callback(has_nan, kalman_gain)
@@ -40,7 +42,7 @@ def ensemble_gaussian_mixture_filter_update_point(
 
     logposterior_weights = jsp.stats.multivariate_normal.logpdf(
         measurement, measurement_device(point),
-        measurement_jacobian @ prior_mixture_covariance @ measurement_jacobian.T + measurement_device.covariance
+        measurement_jacobian @ prior_mixture_covariance @ measurement_jacobian.T + measurement_device_covariance
     )
     if debug:
         assert isinstance(logposterior_weights, Float[Array, ""])
@@ -61,6 +63,7 @@ def ensemble_gaussian_mixture_filter_update_ensemble(
         bandwidth_factor: float,
         key: Key[Array, ""],
         measurement: Float[Array, "measurement_dim"],
+        measurement_device_covariance,
         measurement_device,
         debug: bool = False
 ):
@@ -73,7 +76,7 @@ def ensemble_gaussian_mixture_filter_update_ensemble(
     if debug:
         assert isinstance(subkeys, Key[Array, "batch_dim"])
 
-    emperical_covariance = jnp.cov(state.T)
+    emperical_covariance = jnp.cov(state.T) + 1e-8 * jnp.eye(2)
     if debug:
         # jax.debug.callback(is_positive_definite, emperical_covariance)
         assert isinstance(emperical_covariance, Float[Array, "state_dim state_dim"])
@@ -82,7 +85,9 @@ def ensemble_gaussian_mixture_filter_update_ensemble(
     if debug:
         assert isinstance(mixture_covariance, Float[Array, "state_dim state_dim"])
 
-    posterior_ensemble, logposterior_weights, posterior_covariances = jax.vmap(ensemble_gaussian_mixture_filter_update_point, in_axes=(0, None, None, None, None))(state, mixture_covariance, measurement, measurement_device, debug)
+    posterior_ensemble, logposterior_weights, posterior_covariances = jax.vmap(ensemble_gaussian_mixture_filter_update_point,
+                                                                               in_axes=(0, None, None, None, None))(state,
+                                                                                                                    mixture_covariance, measurement, measurement_device, debug)
 
     if debug:
         assert isinstance(posterior_ensemble, Float[Array, "batch_dim state_dim"])
@@ -111,23 +116,19 @@ def ensemble_gaussian_mixture_filter_update_ensemble(
     if debug:
         assert isinstance(posterior_weights, Float[Array, "batch_dim"])
 
-    return posterior_covariances, posterior_samples
+    return posterior_samples
 
 
-@dataclass
-class EnGMF:
-    dynamical_system: object
+class EnGMF(eqx.Module):
     measurement_device: object
-    state: Float[Array, "batch_dim state_dim"]
     bandwidth_factor: float
 
-    def update(self, key, measurement, debug):
-        self.covariences, self.state = ensemble_gaussian_mixture_filter_update_ensemble(state=self.state,
-                                                                                        bandwidth_factor=self.bandwidth_factor,
-                                                                                        measurement_device=self.measurement_device,
-                                                                                        key=key,
-                                                                                        measurement=measurement,
-                                                                                        debug=debug)
-
-    def predict(self):
-        self.state = self.dynamical_system.flow(self.state)
+    def update(self, state, key, measurement, debug):
+        return ensemble_gaussian_mixture_filter_update_ensemble(
+            state=state,
+            bandwidth_factor=self.bandwidth_factor,
+            measurement_device=self.measurement_device,
+            key=key,
+            measurement=measurement,
+            debug=debug
+        )

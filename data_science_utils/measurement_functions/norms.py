@@ -8,7 +8,9 @@ import equinox as eqx
 
 @jaxtyped(typechecker=typechecker)
 @jax.jit
-def norm_measurement(covariance: Float[Array, "measurement_dim measurement_dim"], state: Float[Array, "*batch_dim state_dim"], key: Optional[Key[Array, "1"]] = None) -> Float[Array, "measurement_dim"]:
+def norm_measurement(state: Float[Array, "*batch_dim state_dim"],
+                     key: Optional[Key[Array, "1"]] = None,
+                     covariance: Float[Array, "measurement_dim measurement_dim"] = jnp.array([[1.0]])) -> Float[Array, "measurement_dim"]:
     perfect_measurement = jnp.linalg.norm(state)
     noise = 0 if key is None else jnp.sqrt(covariance.value) * jax.random.normal(key)
     return jnp.array([perfect_measurement + noise])

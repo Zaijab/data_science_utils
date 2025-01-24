@@ -250,7 +250,7 @@ def discriminator_ensemble_gaussian_mixture_filter_update_ensemble(
     # if debug:
     #     assert isinstance(posterior_weights, Float[Array, "batch_dim"])
 
-    return posterior_covariances, posterior_samples
+    return posterior_samples
 
 
 @dataclass

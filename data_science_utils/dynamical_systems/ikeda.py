@@ -18,6 +18,7 @@ from beartype import beartype as typechecker
 from jax import lax, random
 from jaxtyping import Array, Float, Bool, jaxtyped
 
+import equinox as eqx
 
 @jaxtyped(typechecker=typechecker)
 @partial(jax.jit, static_argnames=['u'])
@@ -42,15 +43,10 @@ def generate(key, batch_size: int = 10**5, u: float = 0.9) -> Array:
 @dataclass
 class IkedaSystem:
     u: float = 0.9
-    state: Float[Array, "*batch 2"] = field(default_factory=lambda: jnp.array([[1.25, 0]]))
-
 
     def __post_init__(self):
         self.flow: Callable[[Float[Array, "*batch 2"]], Float[Array, "*batch 2"]] = partial(flow, u=self.u)
         self.generate: Callable[[Array, int, float], Array] = partial(generate, u=self.u)
-
-    def iterate(self):
-        self.state = self.flow(self.state)
 
 
 @partial(jax.jit, static_argnames=["u", "ninverses"])

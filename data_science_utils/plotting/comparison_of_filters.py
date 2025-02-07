@@ -308,124 +308,6 @@ jax.config.update("jax_persistent_cache_min_compile_time_secs", 0)
 jax.config.update("jax_persistent_cache_enable_xla_caches", "all")
 
 
-def single_filter_iteration(carry, _):
-    """
-    carry = (key, filter_ensemble, true_state)
-    We'll do one iteration of:
-      - Filter update
-      - Flow
-    Returns new carry and an "error" or similar to accumulate.
-    """
-    (key, filter_ensemble, true_state) = carry
-
-    key, subkey = jax.random.split(key)
-    # Filter update
-    updated_ensemble = filter_update_fn(
-        state=filter_ensemble,
-        key=subkey,
-        measurement=norm_measurement(true_state, measurement_cov),
-    )
-
-    # Suppose we want to record the difference
-    error = true_state - jnp.mean(updated_ensemble, axis=0)
-
-    # Flow everything
-    new_ensemble = flow(updated_ensemble)
-    new_true_state = flow(true_state)
-
-    new_carry = (key, new_ensemble, new_true_state)
-    return new_carry, error
-
-def run_filter_lax_scan(
-    key,
-    ensemble_size,
-    measurement_cov,
-    n_steps_burnin,
-    n_steps_measure,
-):
-    """
-    Runs burnin + measure steps using lax.scan. 
-    Returns RMSE across the measurement window.
-    """
-    # Initialize
-    true_state_init = jnp.array([[1.25, 0.0]])
-    key, subkey = jax.random.split(key)
-    filter_ensemble_init = jax.random.multivariate_normal(
-        subkey,
-        shape=(ensemble_size,),
-        mean=true_state_init,
-        cov=jnp.eye(2),
-    )
-
-    # We'll scan over total_steps = burnin + measure
-    total_steps = n_steps_burnin + n_steps_measure
-    carry_init = (key, filter_ensemble_init, true_state_init)
-    # The second arg to lax.scan is an array of shape [total_steps].
-    # We won't use it directly, but we need it to unroll.
-    xs = jnp.arange(total_steps)
-
-    (final_carry, all_errors) = lax.scan(single_filter_iteration, carry_init, xs)
-    # all_errors has shape [total_steps, 2]
-
-    # Discard the burn-in portion from all_errors
-    measure_errors = all_errors[n_steps_burnin:]  # shape [n_steps_measure, 2]
-
-    # Final RMSE
-    rmse = jnp.sqrt(jnp.mean(measure_errors**2))
-    return rmse
-
-#@partial(jax.jit, static_argnames=["ensemble_size"])
-def filter_experiment(
-        ensemble_size,
-        ensemble_initialization_key,
-        measurement_covariance,
-        bandwidth,
-        sampling_function,
-):
-
-    measurement_device = jax.tree_util.Partial(norm_measurement, covariance=measurement_covariance)
-
-    true_state = jnp.array([[1.25, 0.0]])
-
-    ensemble_bandwidth = bandwidth(ensemble_size)
-
-    key, subkey = jax.random.split(ensemble_initialization_key)
-    filter_ensemble = jax.random.multivariate_normal(key=subkey, shape=(ensemble_size,), mean=true_state, cov=jnp.eye(2))
-
-    filter_update = jax.tree_util.Partial(
-        ensemble_gaussian_mixture_filter_update_ensemble,
-        bandwidth_factor=ensemble_bandwidth,
-        measurement_device=jax.tree_util.Partial(measurement_device),
-        measurement_device_covariance=measurement_covariance,
-        sampling_function=sampling_function,
-    )
-
-
-    burn_in_time = 1
-    measurement_time = 10 * burn_in_time
-    states = []
-
-    for t in range(burn_in_time + measurement_time):
-
-        key, subkey = jax.random.split(key)
-
-        filter_ensemble = filter_update(
-            state=filter_ensemble,
-            key=subkey,
-            measurement=measurement_device(state=true_state),
-            debug=debug
-        )
-
-        if t >= burn_in_time:
-            states.append(true_state - jnp.mean(filter_ensemble, axis=0))
-
-        filter_ensemble = flow(filter_ensemble)
-        true_state = flow(true_state)
-
-    e = jnp.expand_dims(jnp.array(states), -1)
-    rmse = jnp.sqrt(jnp.mean(e * e))
-    return rmse
-
 @partial(jax.jit, static_argnames=["ensemble_size"])
 def filter_experiment(
     ensemble_size,
@@ -521,8 +403,9 @@ def filter_experiment(
 
     return rmse
 
+
 debug = False
-ensemble_sizes = range(5, 50, 5)
+ensemble_sizes = range(3, 30, 2)
 
 key = jax.random.key(42)
 key, *ensemble_keys = jax.random.split(key, 1 + 32)
@@ -533,8 +416,10 @@ measurement_covariances = [
     jnp.array([[2.0 ** 2]]),
 ]
 
+
 def silverman_bandwidth(ensemble_size, scale=1):
     return scale * ((4 / (ensemble_size * (2 + 2))) ** (2 / (2 + 4)))
+
 
 bandwidths = [
     jax.tree_util.Partial(silverman_bandwidth, scale=1/3),
@@ -544,15 +429,11 @@ bandwidths = [
 
 sampling_functions = [
     jax.tree_util.Partial(sample_multivariate_normal),
-    jax.tree_util.Partial(rejection_sample_batch, ninverses=8, u=0.9),
+    # jax.tree_util.Partial(rejection_sample_batch, ninverses=8, u=0.9),
 ]
 
-import pandas as pd
 
 records = []
-
-
-print()
 
 for ensemble_size in tqdm(ensemble_sizes, leave=False):
     for ensemble_key in tqdm(ensemble_keys):

@@ -201,7 +201,7 @@ def discriminator_ensemble_gaussian_mixture_filter_update_ensemble(
         measurement_device,
         ninverses: int,
         debug: bool = False
-):
+) -> Float[Array, "batch_dim state_dim"]:
     key: Key[Array, ""]
     subkey: Key[Array, ""]
     subkeys: Key[Array, "batch_dim"]
@@ -251,26 +251,3 @@ def discriminator_ensemble_gaussian_mixture_filter_update_ensemble(
     #     assert isinstance(posterior_weights, Float[Array, "batch_dim"])
 
     return posterior_samples
-
-
-@dataclass
-class DEnGMF:
-    dynamical_system: object
-    measurement_device: object
-    state: Float[Array, "batch_dim state_dim"]
-    bandwidth_factor: float
-    ninverses: int = 10
-
-    def update(self, key, measurement, debug):
-        self.covariences, self.state = discriminator_ensemble_gaussian_mixture_filter_update_ensemble(
-            state=self.state,
-            bandwidth_factor=self.bandwidth_factor,
-            measurement_device=self.measurement_device,
-            key=key,
-            measurement=measurement,
-            ninverses=self.ninverses,
-            debug=debug
-        )
-
-    def predict(self):
-        self.state = self.dynamical_system.flow(self.state)

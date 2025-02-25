@@ -39,7 +39,6 @@ def generate(key, batch_size: int = 10**5, u: float = 0.9) -> Array:
     initial_state = random.uniform(key, shape=(batch_size, 2), minval=-0.25, maxval=0.25)
     return lax.fori_loop(0, 15, body_fn, initial_state)
 
-
 @dataclass
 class IkedaSystem:
     u: float = 0.9

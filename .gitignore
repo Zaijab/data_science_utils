@@ -1,3 +1,6 @@
 .direnv/*
 *.pyc
 .ob-jupyter/*
+cache/*
+plots/*
+profile_default/*

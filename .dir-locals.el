@@ -6,3 +6,5 @@
 ;;          (python-shell-prompt-block-regexp . "\\.\\.\\.\\.: ")
 ;;          (python-shell-prompt-output-regexp . "Out\\[[0-9]+\\]: ")
 ;; 	 (bruh . "hi-zain"))))
+
+((nil . ((default-directory . "/home/zjabbar/code/data_science_utils/"))))

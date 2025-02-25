@@ -2,7 +2,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 
-df = pd.concat([pd.read_csv('experiment.csv'), pd.read_csv('hpc_results.csv')])
+df = pd.concat([df,#pd.read_csv('experiment.csv'),
+                pd.read_csv('../../cache/hpc_results.csv')])
 
 
 import pandas as pd
@@ -30,6 +31,7 @@ def plot_rmse_grid(df, filename="rmse_plot.svg"):
     plt.rcParams["figure.dpi"] = 100
 
     sampler_map = {
+        "sample_gaussian_mixture": "Classical EnGMF",
         "sample_multivariate_normal": "Classical EnGMF",
         "rejection_sample_batch": "Discriminator EnGMF",
         "normalizing_flow": "Normalizing Flow EnGMF"
@@ -85,4 +87,4 @@ def plot_rmse_grid(df, filename="rmse_plot.svg"):
 
     
 # Example usage (assuming your final DataFrame is called df):
-plot_rmse_grid(df)
+plot_rmse_grid(df, filename="plots/rmse_plot_cov_big.svg")

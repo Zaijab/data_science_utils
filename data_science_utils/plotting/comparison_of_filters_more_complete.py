@@ -83,6 +83,7 @@ df_stats = grouped.agg(mean_rmse=("mean"), std_rmse=("std")).reset_index()
 # Create fraction labels for bandwidth and covariance (for facet labels).
 df_stats["bandwidth_str"] = df_stats["bandwidth"].apply(format_fraction)
 df_stats["covariance_str"] = df_stats["covariance"].apply(format_fraction)
+df_stats["ci95"] = 1.96 * df_stats["std_rmse"] / np.sqrt(df_stats["n"])
 
 # -------------------------------
 # Plot the facet grid
@@ -104,7 +105,7 @@ g = sns.FacetGrid(
 
 g.map(
     plt.errorbar,
-    "ensemble_size", "mean_rmse", "std_rmse",
+    "ensemble_size", "mean_rmse", "ci95",
     marker="o", capsize=3, linestyle="--"
 )
 

@@ -28,117 +28,8 @@ from typing import Callable
 
 import jax
 import jax.numpy as jnp
-from beartype import beartype as typechecker
-from jax import lax, random
-from jaxtyping import Array, Float, Bool, jaxtyped
 
-
-@jaxtyped(typechecker=typechecker)
-@partial(jax.jit, static_argnames=['u'])
-def flow(x: Float[Array, "*batch 2"], u: float = 0.9) -> Float[Array, "*batch 2"]:
-    x1, x2 = x[..., 0], x[..., 1]
-    t = 0.4 - (6 / (1 + x1**2 + x2**2))
-    sin_t, cos_t = jnp.sin(t), jnp.cos(t)
-    x1_new = 1 + u * (x1 * cos_t - x2 * sin_t)
-    x2_new = u * (x1 * sin_t + x2 * cos_t)
-    return jnp.stack((x1_new, x2_new), axis=-1)
-
-
-@jaxtyped(typechecker=typechecker)
-@partial(jax.jit, static_argnames=['batch_size', 'u'])
-def generate(key, batch_size: int = 10**5, u: float = 0.9) -> Array:
-    def body_fn(i, val):
-        return flow(val, u)
-    initial_state = random.uniform(key, shape=(batch_size, 2), minval=-0.25, maxval=0.25)
-    return lax.fori_loop(0, 15, body_fn, initial_state)
-
-
-@dataclass
-class IkedaSystem:
-    u: float = 0.9
-    state: Float[Array, "*batch 2"] = jnp.array([[1.25, 0]])
-
-    def __post_init__(self):
-        self.flow: Callable[[Float[Array, "*batch 2"]], Float[Array, "*batch 2"]] = partial(flow, u=self.u)
-        self.generate: Callable[[Array, int, float], Array] = partial(generate, u=self.u)
-
-    def iterate(self):
-        self.state = self.flow(self.state)
-
-
-@partial(jax.jit, static_argnames=["u", "ninverses"])
-def ikeda_attractor_discriminator(
-    x: Float[Array, "*batch 2"],
-    ninverses: int = 7,
-    u: float = 0.9
-) -> Bool[Array, "*batch"]:
-    """
-    Returns a boolean array indicating which points in x are on the Ikeda map's attractor.
-    Replicates the logic of the MATLAB 'onIkedaAttractor' function using repeated inverse iterations.
-    """
-
-    @jax.jit
-    def ikeda_inv(zp1: Float[Array, "*batch 2"]) -> Float[Array, "*batch 2"]:
-        """
-        Inverts the Ikeda map via a fixed number of Newton's method steps and normalizes
-        to preserve the radius as in the MATLAB code.
-        """
-
-        # Unshift and unscale
-        zn = (zp1 - jnp.array([1.0, 0.0])) / u
-
-        def newton_iteration(zi, _):
-            xi, yi = zi[..., 0], zi[..., 1]
-
-            opx2y2 = 1.0 + xi**2 + yi**2
-            ti = 0.4 - 6.0 / opx2y2
-            cti, sti = jnp.cos(ti), jnp.sin(ti)
-
-            dti_dx = 12.0 * xi / (opx2y2**2)
-            dti_dy = 12.0 * yi / (opx2y2**2)
-
-            # Jacobian terms
-            # J = [[J11, J12],
-            #      [J21, J22]]
-            # Each is shape (...,) for batch
-            J11 = cti - (yi * cti + xi * sti) * dti_dx
-            J12 = -sti - (yi * cti + xi * sti) * dti_dy
-            J21 = sti + (xi * cti - yi * sti) * dti_dx
-            J22 = cti + (xi * cti - yi * sti) * dti_dy
-
-            # Residual c = zn - forward(zi)
-            # forward(zi) = [xi*cos(ti)-yi*sin(ti), xi*sin(ti)+yi*cos(ti)]
-            c0 = zn[..., 0] - (xi * cti - yi * sti)
-            c1 = zn[..., 1] - (xi * sti + yi * cti)
-
-            # Solve 2x2 system J * dZi = c
-            detJ = J11 * J22 - J12 * J21
-            dx0 = (J22 * c0 - J12 * c1) / detJ
-            dx1 = (-J21 * c0 + J11 * c1) / detJ
-            zi_next = jnp.stack([xi + dx0, yi + dx1], axis=-1)
-
-            # Enforce the same radius as zn
-            zn_norm = jnp.linalg.norm(zn, axis=-1, keepdims=True)
-            zi_norm = jnp.linalg.norm(zi_next, axis=-1, keepdims=True)
-            zi_next = jnp.where(zi_norm > 0, zn_norm * zi_next / zi_norm, zi_next)
-
-            return zi_next, None
-
-        # Initialize with zn and do 12 Newton steps
-        zi_final, _ = lax.scan(newton_iteration, zn, None, length=8)
-        return zi_final
-
-    def apply_inverse_n_times(x_):
-        def body_fn(_, state):
-            return ikeda_inv(state)
-        return lax.fori_loop(0, ninverses, body_fn, x_)
-
-    x_inv = apply_inverse_n_times(x)
-    threshold = jnp.sqrt(1.0 / (1.0 - u))
-    return jnp.linalg.norm(x_inv, axis=-1) < threshold
-
-
-##############
+from data_science_utils.dynamical_systems import ikeda_attractor_discriminator
 
 grid_spacing = 1000
 x = jnp.linspace(-0.5, 2, grid_spacing)
@@ -146,7 +37,83 @@ y = jnp.linspace(-2.5, 1, grid_spacing)
 XX, YY = jnp.meshgrid(x, y)
 grid = jnp.dstack([XX, YY])
 grid_points = grid.reshape(-1, 2)
-labels = ikeda_attractor_discriminator(grid_points, ninverses=7)
+
+@partial(jax.jit, static_argnames=["u"])
+def ikeda_inverse(
+    x: Float[Array, "*batch 2"],
+    u: float = 0.9
+) -> Bool[Array, "*batch"]:
+    x1, x2 = x[..., 0], x[..., 1]
+    x1, x2 = (x1 - 1) / u, (x2) / u
+    t = (0.4 - (6 / (1 + x1**2 + x2**2)))
+    sin_t, cos_t = jnp.sin(-t), jnp.cos(t)
+    x1_new = (x1 * cos_t - x2 * sin_t)
+    x2_new = (x1 * sin_t + x2 * cos_t)
+    return jnp.stack((x1_new, x2_new), axis=-1)
+
+@partial(jax.jit, static_argnames=["u"])
+def ikeda_inverse(
+    x: Float[Array, "*batch 2"],
+    u: float = 0.9
+) -> Float[Array, "*batch 2"]:
+    # Unscale the coordinates
+    x1_unscaled = (x[..., 0] - 1) / u
+    x2_unscaled = x[..., 1] / u
+    
+    # Calculate the angle parameter t
+    t = 0.4 - (6 / (1 + x1_unscaled**2 + x2_unscaled**2))
+    
+    # Apply the rotation matrix inverse (transpose)
+    # [cos(t)  sin(t)]^T = [cos(t) -sin(t)]
+    # [-sin(t) cos(t)]    [sin(t)  cos(t)]
+    sin_t, cos_t = jnp.sin(t), jnp.cos(t)
+    
+    # The inverse rotation
+    x1_prev = x1_unscaled * cos_t + x2_unscaled * sin_t
+    x2_prev = -x1_unscaled * sin_t + x2_unscaled * cos_t
+    
+    return jnp.stack((x1_prev, x2_prev), axis=-1)
+
+@partial(jax.jit, static_argnames=["u", "ninverses"])
+def ikeda_attractor_discriminator(
+    x: Float[Array, "*batch 2"],
+    ninverses: int = 10,
+    u: float = 0.9
+) -> Bool[Array, "*batch"]:
+
+
+    def apply_inverse_n_times(x_):
+        def body_fn(_, state):
+            return ikeda_inverse(state, u)
+        return lax.fori_loop(0, ninverses, body_fn, x_)
+
+    x_inv = apply_inverse_n_times(x)
+    threshold = jnp.sqrt(1.0 / (1.0 - u))
+    return jnp.linalg.norm(x_inv, axis=-1) < threshold
+
+@partial(jax.jit, static_argnames=["u", "ninverses"])
+def ikeda_attractor_discriminator(
+    x: Float[Array, "*batch 2"],
+    ninverses: int = 10,
+    u: float = 0.9
+) -> Bool[Array, "*batch"]:
+    # Pre-compute threshold
+    threshold_squared = 1.0 / (1.0 - u)
+    
+    def body_fn(i, state):
+        x_curr, is_outside = state
+        x_inv = ikeda_inverse(x_curr, u)
+        norm_squared = jnp.sum(x_inv**2, axis=-1)
+        return x_inv, is_outside | (norm_squared > threshold_squared)
+    
+    # Initialize with False for "is_outside"
+    init_state = (x, jnp.zeros(x.shape[:-1], dtype=bool))
+    x_final, is_outside = lax.fori_loop(0, ninverses, body_fn, init_state)
+    
+    # Return inverse: if ANY iteration went outside the threshold, it's not on attractor
+    return ~is_outside
+
+labels = ikeda_attractor_discriminator(grid_points, ninverses=10)
 labels_grid = labels.reshape(grid_spacing, grid_spacing)
 
 plt.figure(figsize=(8, 6))

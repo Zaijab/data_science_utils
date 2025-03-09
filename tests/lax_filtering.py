@@ -8,16 +8,14 @@ from jaxtyping import Array, Float, Key, jaxtyped
 from beartype import beartype as typechecker
 
 from data_science_utils.filtering import ensemble_gaussian_mixture_filter_update_ensemble
-from data_science_utils.dynamical_systems import ikeda_attractor_discriminator, flow, generate
+from data_science_utils.dynamical_systems import ikeda_attractor_discriminator, ikeda_forward, ikeda_generate
 
 import equinox as eqx
 
-# ------------------------------------------------------------------
-# 0. Utils [NEED TO REFACTOR BADLY]
 
 def plot_against_ikeda(point, mean, cov):
     rng = jax.random.key(100)
-    attractor = generate(rng)
+    attractor = ikeda_generate(rng)
     data = jax.random.multivariate_normal(key=rng, shape=(1000), mean=mean, cov=cov)
     plt.scatter(attractor[:, 0], attractor[:, 1], c='blue')
     plt.scatter(data[:, 0], data[:, 1], c='purple')
@@ -54,9 +52,8 @@ def ikeda_rejection_sample_single(
 
         return (rng, sample, pass_sample, count)
 
-    # Initialize with zero vector and False acceptance
     carry_init = (rng, jnp.zeros_like(mean), False, 0)
-    _, final_sample, _, _ = eqx.internal.while_loop(cond_fun, body_fun, carry_init, kind="checkpointed", max_steps=10**4)
+    _, final_sample, _, _ = eqx.internal.while_loop(cond_fun, body_fun, carry_init, kind="bounded", max_steps=10**4)
     return final_sample
 
 def debug_while_loop(carry, point, mean, cov):
@@ -73,9 +70,6 @@ def ikeda_rejection_sample_batch(
     ninverses: int = 8,
     u: float = 0.9
 ) -> Float[Array, "batch state_dim"]:
-    """
-    For each row in 'means' and 'covs', run rejection_sample_single.
-    """
     return jax.vmap(ikeda_rejection_sample_single, in_axes=(0, 0, 0, None, None))(rng, means, covs, ninverses, u)
 
 
@@ -83,24 +77,6 @@ def ikeda_rejection_sample_batch(
 # 1. EnGMF Update
 @partial(jax.jit, static_argnames=["debug"])
 def engmf_update(key, ensemble, measurement, measurement_device_covariance, measurement_device, bandwidth, debug=False):
-    """
-    EnGMF update using a Gaussian mixture update.
-    
-    Parameters:
-      key: PRNG key.
-      ensemble: Array of shape (batch, state_dim).
-      measurement: Array of shape (measurement_dim,).
-      bandwidth: Scalar bandwidth factor.
-      measurement_covariance: Measurement covariance (e.g. shape (m, m)).
-      sampling_function: Function to sample from the Gaussian mixture.
-      debug: Optional debug flag.
-      
-    Returns:
-      updated_ensemble: Array of shape (batch, state_dim).
-      
-    Note: The function splits the key internally. The caller must split the key
-          externally between calls to avoid reusing keys.
-    """
     subkey, _ = jax.random.split(key)
     bandwidth_factor = bandwidth(ensemble.shape[0])
     updated_ensemble = ensemble_gaussian_mixture_filter_update_ensemble(
@@ -119,22 +95,6 @@ def engmf_update(key, ensemble, measurement, measurement_device_covariance, meas
 # 2. DI-EnGMF Update
 @partial(jax.jit, static_argnames=["debug"])
 def di_engmf_update(key, ensemble, measurement, measurement_device_covariance, measurement_device, bandwidth, debug=False):
-    """
-    Discriminator-Informed EnGMF update using a rejection sampler.
-    
-    Parameters:
-      key: PRNG key.
-      ensemble: Array of shape (batch, state_dim).
-      measurement: Array of shape (measurement_dim,).
-      bandwidth: Scalar bandwidth factor.
-      measurement_covariance: Measurement covariance.
-      debug: Optional debug flag.
-      
-    Returns:
-      updated_ensemble: Array of shape (batch, state_dim).
-      
-    Note: Uses ikeda_rejection_sample_batch as the sampling_function.
-    """
     subkey, _ = jax.random.split(key)
     bandwidth_factor = bandwidth(ensemble.shape[0])
     updated_ensemble = ensemble_gaussian_mixture_filter_update_ensemble(
@@ -153,28 +113,13 @@ def di_engmf_update(key, ensemble, measurement, measurement_device_covariance, m
 # 3. EnKF Update
 @partial(jax.jit, static_argnames=["debug"])
 def enkf_update(key, ensemble, measurement, measurement_device_covariance, measurement_device, inflation_factor, debug=False):
-    """
-    Standard EnKF update with inflation.
-    
-    Parameters:
-      key: PRNG key (included for interface consistency; not used here for randomness).
-      ensemble: Array of shape (batch, state_dim).
-      measurement: Array of shape (measurement_dim,).
-      inflation_factor: Scalar inflation factor.
-      measurement_covariance: Measurement covariance.
-      debug: Optional debug flag.
-      
-    Returns:
-      updated_ensemble: Array of shape (batch, state_dim).
-    """
-    # Compute ensemble mean and inflate the ensemble.
     mean = jnp.mean(ensemble, axis=0)
 
     if debug:
         jax.debug.print('{shape}', mean.shape)
 
     inflated = mean + inflation_factor * (ensemble - mean)
-    # Compute the global covariance with a small regularization.
+
     ensemble_covariance = jnp.cov(inflated.T) + 1e-8 * jnp.eye(inflated.shape[-1])
 
     @jit
@@ -194,20 +139,6 @@ def enkf_update(key, ensemble, measurement, measurement_device_covariance, measu
 # 4. BRUEnKF Update
 @partial(jax.jit, static_argnames=["debug"])
 def bruenkf_update(key, ensemble, measurement, measurement_device_covariance, measurement_device, inflation_factor, num_bruf_steps, debug=False):
-    """
-    Standard EnKF update with inflation.
-    
-    Parameters:
-      key: PRNG key (included for interface consistency; not used here for randomness).
-      ensemble: Array of shape (batch, state_dim).
-      measurement: Array of shape (measurement_dim,).
-      inflation_factor: Scalar inflation factor.
-      measurement_covariance: Measurement covariance.
-      debug: Optional debug flag.
-      
-    Returns:
-      updated_ensemble: Array of shape (batch, state_dim).
-    """
 
     def bruf_update(_, ensemble):
         mean = jnp.mean(ensemble, axis=0)
@@ -270,7 +201,6 @@ def filter_experiment(
 
     #filter_ensemble_init = generate(subkey, batch_size=ensemble_size)
 
-    # Build the partial for the filter update
     filter_update = jax.tree_util.Partial(
         ensemble_update_method,
         measurement_device=measurement_device,
@@ -288,7 +218,6 @@ def filter_experiment(
         (key, ensemble, true_state) = carry
         new_key, subkey = jax.random.split(key)
 
-        # Filter update
         updated_ensemble = filter_update(
             ensemble=ensemble,
             key=subkey,
@@ -296,33 +225,25 @@ def filter_experiment(
             debug=debug,  # or True if you want
         )
 
-        # Compute error only if we're past burn-in
         is_measurement_phase = (step_idx >= burn_in_time)
         error = (true_state - jnp.mean(updated_ensemble, axis=0)) * is_measurement_phase
 
-        # Flow forward
-        ensemble_next = flow(updated_ensemble)
-        true_state_next = flow(true_state)
+
+        ensemble_next = ikeda_forward(updated_ensemble)
+        true_state_next = ikeda_forward(true_state)
 
         new_carry = (new_key, ensemble_next, true_state_next)
         return new_carry, error
 
-    #-------------------------------------------
-    # run lax.scan
-    #-------------------------------------------
     carry_init = (key, filter_ensemble_init, true_state_init)
     steps_array = jnp.arange(total_steps)  # shape (total_steps,)
 
     (final_carry, errors_over_time) = lax.scan(scan_step, carry_init, steps_array)
-    # errors_over_time has shape (total_steps, 2)
-
-    # We only recorded nonzero error in the measurement phase, so we can just compute:
     rmse = jnp.sqrt(jnp.mean(errors_over_time**2))
 
     return rmse
 
 
-# Initialize the PRNG key.
 key = jax.random.key(100)
 key, subkey = jax.random.split(key)
 true_state = jnp.array([[1.25, 0.0]])
@@ -359,13 +280,13 @@ ensemble_update_methods = [
     # jax.tree_util.Partial(engmf_update, bandwidth=jax.tree_util.Partial(silverman_bandwidth, scale=3 / 3)),
     # jax.tree_util.Partial(di_engmf_update, bandwidth=jax.tree_util.Partial(silverman_bandwidth, scale=1 / 3)),
     # jax.tree_util.Partial(di_engmf_update, bandwidth=jax.tree_util.Partial(silverman_bandwidth, scale=2 / 3)),
-    # jax.tree_util.Partial(di_engmf_update, bandwidth=jax.tree_util.Partial(silverman_bandwidth, scale=3 / 3)),
-    jax.tree_util.Partial(enkf_update, inflation_factor=1.01),
-    jax.tree_util.Partial(bruenkf_update, inflation_factor=1.01, num_bruf_steps=5),
+    jax.tree_util.Partial(di_engmf_update, bandwidth=jax.tree_util.Partial(silverman_bandwidth, scale=3 / 3)),
+    # jax.tree_util.Partial(enkf_update, inflation_factor=1.01),
+    # jax.tree_util.Partial(bruenkf_update, inflation_factor=1.01, num_bruf_steps=5),
 ]
 
 debug = False
-ensemble_sizes = range(3, 21, 1)
+ensemble_sizes = range(5, 21, 1)
 
 key = jax.random.key(42)
 key, *ensemble_keys = jax.random.split(key, 1 + 32)

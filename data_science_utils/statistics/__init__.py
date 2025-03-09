@@ -1,1 +1,2 @@
 from data_science_utils.statistics.random_sampling import rejection_sample_batch
+from data_science_utils.statistics.epanechnikov import logpdf_epanechnikov, pdf_epanechnikov, sample_epanechnikov

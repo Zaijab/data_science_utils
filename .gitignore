@@ -4,3 +4,5 @@
 cache/*
 plots/*
 profile_default/*
+**/__pycache__/
+**/results/

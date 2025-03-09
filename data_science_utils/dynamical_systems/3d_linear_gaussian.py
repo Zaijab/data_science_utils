@@ -1,26 +1,26 @@
-import jax
-import jax.numpy as jnp
-from jaxtyping import Float, Array
-
 """
 This dynamical system is a birth-death process
 """
 
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, Float, Key
+from jaxtyping import Float, Array, Key
 from functools import partial
 
-@jax.jit
-def flow(state: Float[Array, "6"], dt: float = 0.1, key: Key[Array, "1"] = jax.random.key(42)) -> Float[Array, "6"]:
-    # Construct the state transition matrix F (6x6) for a constant velocity model.
-    # F = [ I3   dt * I3 ]
-    #     [ 0    I3     ]
-    F: Float[Array, "6 6"] = jnp.block([
-        [jnp.eye(3), dt * jnp.eye(3)],
-        [jnp.zeros((3, 3)), jnp.eye(3)]
-    ])
 
+@jax.jit
+def flow(
+        state: Float[Array, "2*spatial_dim"],
+        dt: float = 0.1,
+        key: None | Key[Array, "1"] = None
+) -> Float[Array, "spatial_dim"]:
+    spatial_dim = state.shape[0] / 2
+    single_dimension_state_transition = jnp.array([[1.0, dt],
+                                                   [0, 1.0]])
+    state_transition = jnp.kron(jnp.eye(spatial_dim), single_dimension_state_transition)
+
+    perfect_transitioned_state = state_transition @ state
+    
     # Process noise: acceleration noise is scaled by sigma_v.
     sigma_v: float = 5.0
     # Define B0 (2x1) for one spatial dimension: position noise = (dt^2)/2 and velocity noise = dt.
@@ -45,5 +45,5 @@ def flow(state: Float[Array, "6"], dt: float = 0.1, key: Key[Array, "1"] = jax.r
 
 # Example usage:
 state_vector: Float[Array, "6"] = jnp.array([0, 15, 0, -10, -10, 3])
-new_state: Float[Array, "6"] = flow(state_vector, dt=0.1, key=jax.random.key(42))
+new_state: Float[Array, "6"] = flow(state_vector, dt=1, key=None)
 print(new_state)

@@ -7,6 +7,7 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
+import equinox as eqx
 from beartype import beartype as typechecker
 from jaxtyping import Array, Float, jaxtyped
 
@@ -28,4 +29,20 @@ def f(x: Float[Array, "state_dim"], debug: bool = False) -> Float[Array, "2*stat
     return jnp.zeros(x.shape[0] * 2)
 
 
-f(jnp.zeros(2), debug=True)
+@jaxtyped(typechecker=typechecker)
+class myClass(eqx.Module):
+    x: Float[Array, "2"]
+    # y: Float[Array, "2"] # Not initialized during init
+
+    def __init__(self, myinput):
+        self.x = jnp.array([1.2, 1.0])
+        # self.x = jnp.array([1, 1]) # Uncomment for angry Python, wrong dtype
+        # self.x = jnp.eye(3) # Uncomment for angry Python, wrong shape
+
+    def update(self):
+        self.x = self.x + 1
+
+# f(jnp.zeros(2), debug=True)
+
+myClass(jnp.array([1.0,2.0])).update()
+

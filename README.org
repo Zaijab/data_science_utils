@@ -6,6 +6,11 @@ A common way to compare models is to run a different model on a public, well-kno
 
 * Models
 
+* Pipelines
+
+This module contains code which brings together multiple modules which need to work together.
+Testing this module entails 
+
 * TODO 
 
 * TODO 

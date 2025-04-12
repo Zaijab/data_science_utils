@@ -1,5 +1,7 @@
 (use-modules (gnu packages)
+	     (guix download)
 	     (guix profiles)
+	     (guix build-system python)
 	     (guix packages)
 	     (guix git-download)
 	     (guix build-system pyproject)
@@ -17,10 +19,35 @@
 	     (guix-science packages python)
 	     (guix-science packages machine-learning))
 
+(define-public python-jaxtyping-three
+  (package
+    (name "python-jaxtyping")
+    (version "0.3.0")
+    (source (origin
+              (method url-fetch)
+              (uri (pypi-uri "jaxtyping" version))
+              (sha256
+               (base32
+                "1pk8m47b7cy6fyl7yp63r403fka090alav0bvnnk4lr96rjbad5k"))))
+    (build-system pyproject-build-system)
+    ;; Tests require JAX, but JAX can't be packaged because it uses the Bazel
+    ;; build system.
+    (arguments (list #:tests? #f))
+    (native-inputs (list python-hatchling))
+    (propagated-inputs (list python-numpy python-wadler-lindig python-typeguard
+                             python-typing-extensions))
+    (home-page "https://github.com/google/jaxtyping")
+    (synopsis
+     "Type annotations and runtime checking for JAX arrays and others")
+    (description "@code{jaxtyping} provides type annotations and runtime
+checking for shape and dtype of JAX arrays, PyTorch, NumPy, TensorFlow, and
+PyTrees.")
+    (license license:expat)))
+
 (define-public python-flax
   (package
     (name "python-flax")
-    (version "0.10.2")
+    (version "0.10.0")
     (source
      (origin
        (method git-fetch)
@@ -29,11 +56,10 @@
              (commit (string-append "v" version))))
        (file-name (git-file-name name version))
        (sha256
-        (base32 "0dwdzp97qb1a291gnhvvs8qfqjib4q7khb3422p6sjrns9gysvbm"))))
+        (base32 "195m9wdjdp2s47mzd1nl5cvkf7xhiaq87hddwa8kfx9gd9fzcgjy"))))
     (build-system pyproject-build-system)
     (arguments
      (list
-      #:tests? #f
       #:test-flags
       '(list "--pyargs" "tests"
              ;; We don't have tensorboard
@@ -46,10 +72,11 @@
              "--ignore=tests/linen/linen_dtypes_test.py"
              ;; These tests try to use a fixed number of CPUs that may
              ;; exceed the number of CPUs available at build time.
-             "--ignore=tests/jax_utils_test.py")
+             "--ignore=tests/jax_utils_test.py"
+	     "--ignore=tests/flaxlib_test.py"
+	     "--ignore=tests/nnx/transforms_test.py")
       #:phases
       '(modify-phases %standard-phases
-	 (delete 'sanity-check)
          (add-after 'unpack 'ignore-deprecations
            (lambda _
              (substitute* "pyproject.toml"
@@ -82,6 +109,34 @@
 designed for flexibility.")
     (license license:asl2.0)))
 
+(define-public python-equinox
+  (package
+    (name "python-equinox")
+    (version "0.11.10")
+    (source
+     (origin
+       (method git-fetch)
+       (uri (git-reference
+             (url "https://github.com/patrick-kidger/equinox")
+             (commit (string-append "v" version))))
+       (file-name (git-file-name name version))
+       (sha256
+        (base32 "1gm8xxx1inbzjfqvd6224k3arbcf7dyfk258rbbkl22nvcnv12j2"))))
+    (build-system pyproject-build-system)
+    (arguments (list #:tests? #f))
+    (native-inputs (list python-hatchling))
+    (propagated-inputs (list python-jax
+			     python-jaxtyping-three
+                             python-typing-extensions))
+    (home-page "https://github.com/google/jaxtyping")
+    (synopsis
+     "Type annotations and runtime checking for JAX arrays and others")
+    (description "@code{jaxtyping} provides type annotations and runtime
+checking for shape and dtype of JAX arrays, PyTorch, NumPy, TensorFlow, and
+PyTrees.")
+    (license license:expat)))
+
+
 (packages->manifest (list
 		     python
 		     jupyter
@@ -93,6 +148,7 @@ designed for flexibility.")
 		     python-pytorch
 		     python-tensorflow
 		     python-jax
-		     python-jaxtyping
+		     python-jaxtyping-three
 		     python-beartype
+		     python-equinox
 		     python-flax))

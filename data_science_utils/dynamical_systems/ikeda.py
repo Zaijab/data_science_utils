@@ -5,11 +5,14 @@ import jax.numpy as jnp
 from beartype import beartype as typechecker
 from jax import lax, random
 from jaxtyping import Array, Bool, Float, jaxtyped
+import equinox as eqx
 
 
 @jaxtyped(typechecker=typechecker)
-@partial(jax.jit, static_argnames=['u'])
-def ikeda_forward(x: Float[Array, "*batch 2"], u: float = 0.9) -> Float[Array, "*batch 2"]:
+@partial(jax.jit, static_argnames=["u"])
+def ikeda_forward(
+    x: Float[Array, "*batch 2"], u: float = 0.9
+) -> Float[Array, "*batch 2"]:
     x1, x2 = x[..., 0], x[..., 1]
     t = 0.4 - (6 / (1 + x1**2 + x2**2))
     sin_t, cos_t = jnp.sin(t), jnp.cos(t)
@@ -20,8 +23,7 @@ def ikeda_forward(x: Float[Array, "*batch 2"], u: float = 0.9) -> Float[Array, "
 
 @partial(jax.jit, static_argnames=["u"])
 def ikeda_backward(
-    x: Float[Array, "*batch 2"],
-    u: float = 0.9
+    x: Float[Array, "*batch 2"], u: float = 0.9
 ) -> Float[Array, "*batch 2"]:
 
     x1_unscaled = (x[..., 0] - 1) / u
@@ -36,19 +38,20 @@ def ikeda_backward(
 
 
 @jaxtyped(typechecker=typechecker)
-@partial(jax.jit, static_argnames=['batch_size', 'u'])
+@partial(jax.jit, static_argnames=["batch_size", "u"])
 def ikeda_generate(key, batch_size: int = 10**5, u: float = 0.9) -> Array:
     def body_fn(i, val):
         return ikeda_forward(val, u)
-    initial_state = random.uniform(key, shape=(batch_size, 2), minval=-0.25, maxval=0.25)
+
+    initial_state = random.uniform(
+        key, shape=(batch_size, 2), minval=-0.25, maxval=0.25
+    )
     return lax.fori_loop(0, 15, body_fn, initial_state)
 
 
 @partial(jax.jit, static_argnames=["u", "ninverses"])
 def ikeda_attractor_discriminator(
-    x: Float[Array, "*batch 2"],
-    ninverses: int = 10,
-    u: float = 0.9
+    x: Float[Array, "*batch 2"], ninverses: int = 10, u: float = 0.9
 ) -> Bool[Array, "*batch"]:
     # Pre-compute threshold
     threshold_squared = 1.0 / (1.0 - u)
@@ -65,12 +68,26 @@ def ikeda_attractor_discriminator(
 
     # Use scan instead of fori_loop
     (x_final, is_outside), _ = lax.scan(
-        scan_fn,
-        init_state,
-        None,  # We don't need any carry values
-        length=ninverses
+        scan_fn, init_state, None, length=ninverses  # We don't need any carry values
     )
 
     # Return inverse: if ANY iteration went outside the threshold, it's not on attractor
     return ~is_outside
 
+
+class Ikeda(eqx.Module):
+    n_inverses: int = 10
+    u: float = 0.9
+    batch_size: int = 10**5
+
+    def forward(
+        self,
+        x: Float[Array, "*batch 2"],
+    ) -> Float[Array, "*batch 2"]:
+        return ikeda_forward(x, u=self.u)
+
+    def backward(
+        self,
+        x: Float[Array, "*batch 2"],
+    ) -> Float[Array, "*batch 2"]:
+        return ikeda_backward(x, u=self.u)

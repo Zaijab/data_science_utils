@@ -5,11 +5,11 @@
 (list
  (channel
   (name 'guix-science)
-  (url "https://codeberg.org/nihil/guix-science.git")
+  (url "https://codeberg.org/guix-science/guix-science.git")
   (branch "master")
   (commit
-   "d9870babd41998cee24d29d04cdee7f64e978b16")
-  #;(introduction
+   "ba8ac0e31d7a16c7442313fbf052c3b19b036d68")
+  (introduction
    (make-channel-introduction
     "b1fe5aaff3ab48e798a4cce02f0212bc91f423dc"
     (openpgp-fingerprint
@@ -19,7 +19,7 @@
   (url "https://git.savannah.gnu.org/git/guix.git")
   (branch "master")
   (commit
-   "be5a8ee7a3ebe184a6e7bd8f7a82ea0b81046086")
+   "2eb22e3d0f8013e438813b1a2c5f8b1e020fcde2")
   (introduction
    (make-channel-introduction
     "9edb3f66fd807b096b48283debdcddccfea34bad"

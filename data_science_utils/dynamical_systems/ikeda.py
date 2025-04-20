@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 from beartype import beartype as typechecker
 from jax import lax, random
-from jaxtyping import Array, Bool, Float, jaxtyped
+from jaxtyping import Array, Bool, Float, Key, jaxtyped
 import equinox as eqx
 
 
@@ -80,6 +80,14 @@ class Ikeda(eqx.Module):
     u: float = 0.9
     batch_size: int = 10**5
 
+    @property
+    def dimension(self):
+        return 2
+
+    @property
+    def initial_state(self):
+        return jnp.array([1.25, 0])
+
     def forward(
         self,
         x: Float[Array, "*batch 2"],
@@ -91,3 +99,10 @@ class Ikeda(eqx.Module):
         x: Float[Array, "*batch 2"],
     ) -> Float[Array, "*batch 2"]:
         return ikeda_backward(x, u=self.u)
+
+    def generate(
+        self,
+        key: Key[Array, "1"],
+        batch_size: int,
+    ) -> Float[Array, "{batch_size} 2"]:
+        return ikeda_generate(key, batch_size)

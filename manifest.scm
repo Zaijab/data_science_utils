@@ -11,6 +11,7 @@
 	     (gnu packages python)
 	     (gnu packages jupyter)
 	     (gnu packages check)
+	     (gnu packages version-control)
 	     (gnu packages python-xyz)
 	     (gnu packages python-check)
 	     (gnu packages pdf)
@@ -136,10 +137,91 @@ checking for shape and dtype of JAX arrays, PyTorch, NumPy, TensorFlow, and
 PyTrees.")
     (license license:expat)))
 
+(define-public python-optax
+  (package
+    (name "python-optax")
+    ;; 0.1.6 needs a more recent numpy
+    (version "0.2.4")
+    (source
+     (origin
+       (method url-fetch)
+       (uri (pypi-uri "optax" version))
+       (sha256
+        (base32 "0dkkyh2a6j94k6g5xljfbl1hqfndwqvax1wi656dwvby63ax61af"))))
+    (build-system pyproject-build-system)
+    ;; Tests require haiku, tensorflow, and flax, but flax needs
+    ;; optax.
+    (arguments
+     (list #:tests? #false))
+    (propagated-inputs (list python-absl-py
+                             python-chex
+                             python-jax
+                             python-jaxlib
+                             python-numpy))
+    (native-inputs
+     (list python-dm-tree
+           python-pytest
+           python-setuptools	   
+	   python-flit-core
+	   python-etils
+           python-wheel))
+    (home-page "https://github.com/google-deepmind/optax/")
+    (synopsis "Gradient processing and optimization library for JAX")
+    (description "Optax is a gradient processing and optimization
+library for JAX.")
+    (license license:asl2.0)))
+
+
+(define-public python-lineax
+  (package
+    (name "python-lineax")
+    (version "0.0.7")
+    (source
+     (origin
+       (method url-fetch)
+       (uri (pypi-uri "lineax" version))
+       (sha256
+        (base32 "0j7a80lgg059nan7nj33ng6180hsfik4irdgd132shq2sal4jdg4"))))
+    (build-system pyproject-build-system)
+    (arguments (list #:tests? #f))
+    (propagated-inputs (list python-equinox python-jax python-jaxtyping-three
+                             python-typing-extensions python-typing-extensions))
+    (native-inputs (list python-hatchling))
+    (home-page #f)
+    (synopsis "Linear solvers in JAX and Equinox.")
+    (description "Linear solvers in JAX and Equinox.")
+    (license #f)))
+
+(define-public python-ott-jax
+  (package
+    (name "python-ott-jax")
+    (version "0.5.0")
+    (source
+     (origin
+       (method url-fetch)
+       (uri (pypi-uri "ott_jax" version))
+       (sha256
+        (base32 "0ljyfvq7ylsyhsxkj5gygsbzc7x7p0d28avawq323inlflba9bha"))))
+    (build-system pyproject-build-system)
+    (arguments (list #:tests? #f))
+    (native-inputs (list python-hatchling python-setuptools python-etils))
+    (propagated-inputs (list python-jax
+                             python-jaxopt
+                             python-lineax
+                             python-numpy
+                             python-optax
+                             python-typing-extensions))
+    (home-page #f)
+    (synopsis "Optimal Transport Tools in JAX")
+    (description "Optimal Transport Tools in JAX.")
+    (license #f)))
+
+
 
 (packages->manifest (list
 		     python
 		     jupyter
+		     python-ott-jax
 		     python-numpy
 		     python-pandas
 		     python-matplotlib

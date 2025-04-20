@@ -49,7 +49,7 @@ class CVModel(eqx.Module):
 
     @jaxtyped(typechecker=typechecker)
     @partial(jax.jit, static_argnames=["debug"])
-    def flow(
+    def forward(
         self,
         state: Float[Array, "2*{self.position_dimension} 1"],
         key: None | Key[Array, "..."] = None,

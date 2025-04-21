@@ -20,6 +20,8 @@ def filter_update(
     """
     (prior_ensemble, true_state) = carry
 
+    jax.debug.print("{}", prior_ensemble.shape)
+
     updated_ensemble = update(
         ensemble=prior_ensemble,
         measurement=measurement_system(state=true_state),
@@ -46,6 +48,9 @@ def evaluate_filter(
     key,  # omega
     debug=False,
 ):
+    print(1)
+    jax.debug.print("{}", jnp.array([1.0]))
+    jax.debug.print("AHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH")
     burn_in_time = 100
     measurement_time = 10 * burn_in_time
     total_steps = burn_in_time + measurement_time

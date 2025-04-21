@@ -6,4 +6,4 @@ from data_science_utils.filtering.dengmf import (
 )
 from data_science_utils.filtering.etpf import solve_optimal_transport, etpf_update
 
-from data_science_utils.filtering.evaluate_filter import evaluate_filter
+from data_science_utils.filtering.evaluate import evaluate_filter

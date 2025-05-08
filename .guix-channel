@@ -5,7 +5,8 @@
    (name guix-science)
    (url "https://codeberg.org/guix-science/guix-science.git")
    (branch "master")
-   (commit "33add622caaa24efe8b0fa7274939d139e4f0d34")
+   (commit "f309f554e37db5087ea0db086ad71915dd0eefe5")
+   ; (commit "33add622caaa24efe8b0fa7274939d139e4f0d34")
    (introduction
     (channel-introduction
      (version 0)
@@ -15,7 +16,8 @@
    (name guix)
    (url "https://git.savannah.gnu.org/git/guix.git")
    (branch "master")
-   (commit "be5a8ee7a3ebe184a6e7bd8f7a82ea0b81046086")
+   (commit "501a9603f5e3cda07f3be8e7fecac31f7af5ce52")
+   ; (commit "be5a8ee7a3ebe184a6e7bd8f7a82ea0b81046086")
    (introduction
     (channel-introduction
      (version 0)

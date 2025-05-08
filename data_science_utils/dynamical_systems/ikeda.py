@@ -6,6 +6,7 @@ from beartype import beartype as typechecker
 from jax import lax, random
 from jaxtyping import Array, Bool, Float, Key, jaxtyped
 import equinox as eqx
+from data_science_utils.dynamical_systems import AbstractDynamicalSystem
 
 
 @jaxtyped(typechecker=typechecker)
@@ -75,10 +76,10 @@ def ikeda_attractor_discriminator(
     return ~is_outside
 
 
-class Ikeda(eqx.Module):
+class Ikeda(AbstractDynamicalSystem, strict=True):
     n_inverses: int = 10
     u: float = 0.9
-    batch_size: int = 10**5
+    batch_size: int = 10**3
 
     @property
     def dimension(self):
@@ -103,6 +104,6 @@ class Ikeda(eqx.Module):
     def generate(
         self,
         key: Key[Array, "1"],
-        batch_size: int,
+        batch_size: int = batch_size,
     ) -> Float[Array, "{batch_size} 2"]:
         return ikeda_generate(key, batch_size)

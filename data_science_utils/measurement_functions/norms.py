@@ -1,6 +1,7 @@
 import jax
 import jax.numpy as jnp
 import equinox as eqx
+from data_science_utils.measurement_functions.abc import AbstractMeasurementSystem
 from jaxtyping import jaxtyped, Float, Array, Key
 from beartype import beartype as typechecker
 
@@ -17,7 +18,7 @@ def norm_measurement(
     return (perfect_measurement + noise).reshape(-1)
 
 
-class RangeSensor(eqx.Module):
+class RangeSensor(AbstractMeasurementSystem):
     covariance: Float[Array, "1 1"]
 
     def __call__(self, state, key=None):

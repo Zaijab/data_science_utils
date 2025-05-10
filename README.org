@@ -22,3 +22,5 @@ Testing this module entails
 Every individual module is tested in =tests/unit/test_*.py=
 Every individual module is tested in =tests/unit/test_*.py=
 
+=cache= Holds data and model data (like weights)
+=channels.scm= + =.direnv= + =.envrc= + =.guix= + =guix-channel=

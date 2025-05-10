@@ -18,9 +18,7 @@
 	     (gnu packages python-science)
 	     (gnu packages machine-learning)
 	     (guix-science packages python)
-	     (guix-science packages machine-learning)
-	     (guix-science-nonfree packages machine-learning)
-	     )
+	     (guix-science packages machine-learning))
 
 (define-public python-jaxtyping-three
   (package
@@ -634,6 +632,46 @@ setuptools.setup(
      "Official Python devkit for the nuScenes autonomous driving dataset.")
     (license #f)))  ;; Replace with appropriate license if known
 
+(define-public python-optimistix
+  (package
+    (name "python-optimistix")
+    (version "0.0.10")
+    (source
+     (origin
+       (method url-fetch)
+       (uri (pypi-uri "optimistix" version))
+       (sha256
+        (base32 "0l006pv5zvqlfyyc9w1qw2vqg42ssrqqn5blmxg49jb4dpb83940"))))
+    (build-system pyproject-build-system)
+    (arguments (list #:tests? #f))
+    (propagated-inputs (list python-jax python-jaxtyping-three python-lineax python-equinox python-typing-extensions))
+    (native-inputs (list python-hatchling))
+    (home-page #f)
+    (synopsis "Linear solvers in JAX and Equinox.")
+    (description "Linear solvers in JAX and Equinox.")
+    (license #f)))
+
+
+(define-public python-diffrax
+  (package
+    (name "python-diffrax")
+    (version "0.6.1")
+    (source
+     (origin
+       (method url-fetch)
+       (uri (pypi-uri "diffrax" version))
+       (sha256
+        (base32 "1gxqzjqwi1vwa3s6i78rq4mdxsrsc8dyyhkknip5bcpqphjbml6q"))))
+    (build-system pyproject-build-system)
+    (arguments (list #:tests? #f))
+    (propagated-inputs (list python-jax python-jaxtyping-three python-typing-extensions python-typeguard python-equinox python-lineax python-optimistix))
+    (native-inputs (list python-hatchling))
+    (home-page #f)
+    (synopsis "Linear solvers in JAX and Equinox.")
+    (description "Linear solvers in JAX and Equinox.")
+    (license #f)))
+
+
 (packages->manifest (list
 		     python
 		     jupyter
@@ -646,13 +684,11 @@ setuptools.setup(
 		     python-pytorch
 		     python-tensorflow
 		     python-jax
-		     ;; python-jax-with-cuda11
 		     python-jaxtyping-three
 		     python-beartype
 		     python-equinox
 		     python-flax
-		     
+		     python-optimistix
+		     python-diffrax
 		     python-waymax
 		     python-evosax))
-
-

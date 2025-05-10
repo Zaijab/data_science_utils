@@ -21,6 +21,7 @@ def kl_divergence(
     return -jnp.mean(total_log_prob)
 
 
+@eqx.filter_jit
 def make_step(
     model: Callable, x, optim, opt_state
 ) -> tuple[Float[Array, "..."], Float[Array, "..."], Float[Array, "..."]]:

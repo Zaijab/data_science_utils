@@ -14,3 +14,11 @@ Testing this module entails
 * TODO 
 
 * TODO 
+
+* Organizational Principles
+
+=data_science_utils/*= Contains modules
+
+Every individual module is tested in =tests/unit/test_*.py=
+Every individual module is tested in =tests/unit/test_*.py=
+

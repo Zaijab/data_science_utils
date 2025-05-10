@@ -7,8 +7,14 @@ import itertools
 from jaxtyping import Array, Float, Key, jaxtyped
 from beartype import beartype as typechecker
 
-from data_science_utils.filtering import ensemble_gaussian_mixture_filter_update_ensemble
-from data_science_utils.dynamical_systems import ikeda_attractor_discriminator, ikeda_forward, ikeda_generate
+from data_science_utils.filtering import (
+    ensemble_gaussian_mixture_filter_update_ensemble,
+)
+from data_science_utils.dynamical_systems import (
+    ikeda_attractor_discriminator,
+    ikeda_forward,
+    ikeda_generate,
+)
 
 import equinox as eqx
 
@@ -17,9 +23,9 @@ def plot_against_ikeda(point, mean, cov):
     rng = jax.random.key(100)
     attractor = ikeda_generate(rng)
     data = jax.random.multivariate_normal(key=rng, shape=(1000), mean=mean, cov=cov)
-    plt.scatter(attractor[:, 0], attractor[:, 1], c='blue')
-    plt.scatter(data[:, 0], data[:, 1], c='purple')
-    plt.scatter(point[0], point[1], c='lime', s=100)
+    plt.scatter(attractor[:, 0], attractor[:, 1], c="blue")
+    plt.scatter(data[:, 0], data[:, 1], c="purple")
+    plt.scatter(point[0], point[1], c="lime", s=100)
     plt.show()
 
 
@@ -48,13 +54,16 @@ def ikeda_rejection_sample_single(
         sample = jax.random.multivariate_normal(subkey_candidate, mean=mean, cov=cov)
         pass_sample = ikeda_attractor_discriminator(sample, ninverses, u)
 
-        #jax.debug.callback(debug_while_loop, carry, sample, mean, cov)
+        # jax.debug.callback(debug_while_loop, carry, sample, mean, cov)
 
         return (rng, sample, pass_sample, count)
 
     carry_init = (rng, jnp.zeros_like(mean), False, 0)
-    _, final_sample, _, _ = eqx.internal.while_loop(cond_fun, body_fun, carry_init, kind="bounded", max_steps=10**4)
+    _, final_sample, _, _ = eqx.internal.while_loop(
+        cond_fun, body_fun, carry_init, kind="bounded", max_steps=10**4
+    )
     return final_sample
+
 
 def debug_while_loop(carry, point, mean, cov):
     if carry[-1] > 1500 and (carry[-1] % 500) == 0:
@@ -68,15 +77,25 @@ def ikeda_rejection_sample_batch(
     means: Float[Array, "batch state_dim"],
     covs: Float[Array, "batch state_dim state_dim"],
     ninverses: int = 8,
-    u: float = 0.9
+    u: float = 0.9,
 ) -> Float[Array, "batch state_dim"]:
-    return jax.vmap(ikeda_rejection_sample_single, in_axes=(0, 0, 0, None, None))(rng, means, covs, ninverses, u)
+    return jax.vmap(ikeda_rejection_sample_single, in_axes=(0, 0, 0, None, None))(
+        rng, means, covs, ninverses, u
+    )
 
 
 # -------------------------------------------------------------------
 # 1. EnGMF Update
 @partial(jax.jit, static_argnames=["debug"])
-def engmf_update(key, ensemble, measurement, measurement_device_covariance, measurement_device, bandwidth, debug=False):
+def engmf_update(
+    key,
+    ensemble,
+    measurement,
+    measurement_device_covariance,
+    measurement_device,
+    bandwidth,
+    debug=False,
+):
     subkey, _ = jax.random.split(key)
     bandwidth_factor = bandwidth(ensemble.shape[0])
     updated_ensemble = ensemble_gaussian_mixture_filter_update_ensemble(
@@ -87,14 +106,23 @@ def engmf_update(key, ensemble, measurement, measurement_device_covariance, meas
         measurement_device_covariance=measurement_device_covariance,
         measurement_device=measurement_device,
         sampling_function=jax.tree_util.Partial(sample_gaussian_mixture),
-        debug=debug
+        debug=debug,
     )
     return updated_ensemble
+
 
 # -------------------------------------------------------------------
 # 2. DI-EnGMF Update
 @partial(jax.jit, static_argnames=["debug"])
-def di_engmf_update(key, ensemble, measurement, measurement_device_covariance, measurement_device, bandwidth, debug=False):
+def di_engmf_update(
+    key,
+    ensemble,
+    measurement,
+    measurement_device_covariance,
+    measurement_device,
+    bandwidth,
+    debug=False,
+):
     subkey, _ = jax.random.split(key)
     bandwidth_factor = bandwidth(ensemble.shape[0])
     updated_ensemble = ensemble_gaussian_mixture_filter_update_ensemble(
@@ -105,18 +133,27 @@ def di_engmf_update(key, ensemble, measurement, measurement_device_covariance, m
         measurement_device_covariance=measurement_device_covariance,
         measurement_device=measurement_device,
         sampling_function=jax.tree_util.Partial(ikeda_rejection_sample_batch),
-        debug=debug
+        debug=debug,
     )
     return updated_ensemble
+
 
 # -------------------------------------------------------------------
 # 3. EnKF Update
 @partial(jax.jit, static_argnames=["debug"])
-def enkf_update(key, ensemble, measurement, measurement_device_covariance, measurement_device, inflation_factor, debug=False):
+def enkf_update(
+    key,
+    ensemble,
+    measurement,
+    measurement_device_covariance,
+    measurement_device,
+    inflation_factor,
+    debug=False,
+):
     mean = jnp.mean(ensemble, axis=0)
 
     if debug:
-        jax.debug.print('{shape}', mean.shape)
+        jax.debug.print("{shape}", mean.shape)
 
     inflated = mean + inflation_factor * (ensemble - mean)
 
@@ -126,19 +163,38 @@ def enkf_update(key, ensemble, measurement, measurement_device_covariance, measu
     def update_ensemble_point(point, key):
         point_measurement = measurement_device(point, key)
         measurement_jacobian = jax.jacfwd(measurement_device)(point)
-        innovation_covariance = measurement_jacobian @ ensemble_covariance @ measurement_jacobian.T + measurement_device_covariance
-        kalman_gain = ensemble_covariance @ measurement_jacobian.T @ jnp.linalg.inv(innovation_covariance)
-        point = point + (kalman_gain @ jnp.atleast_2d(measurement - point_measurement)).reshape(-1)
+        innovation_covariance = (
+            measurement_jacobian @ ensemble_covariance @ measurement_jacobian.T
+            + measurement_device_covariance
+        )
+        kalman_gain = (
+            ensemble_covariance
+            @ measurement_jacobian.T
+            @ jnp.linalg.inv(innovation_covariance)
+        )
+        point = point + (
+            kalman_gain @ jnp.atleast_2d(measurement - point_measurement)
+        ).reshape(-1)
         return point
 
     keys = jax.random.split(key, ensemble.shape[0])
     updated_ensemble = vmap(update_ensemble_point)(inflated, keys)
     return updated_ensemble
 
+
 # -------------------------------------------------------------------
 # 4. BRUEnKF Update
 @partial(jax.jit, static_argnames=["debug"])
-def bruenkf_update(key, ensemble, measurement, measurement_device_covariance, measurement_device, inflation_factor, num_bruf_steps, debug=False):
+def bruenkf_update(
+    key,
+    ensemble,
+    measurement,
+    measurement_device_covariance,
+    measurement_device,
+    inflation_factor,
+    num_bruf_steps,
+    debug=False,
+):
 
     def bruf_update(_, ensemble):
         mean = jnp.mean(ensemble, axis=0)
@@ -149,9 +205,18 @@ def bruenkf_update(key, ensemble, measurement, measurement_device_covariance, me
         def update_ensemble_point(point, key):
             point_measurement = measurement_device(point, key)
             measurement_jacobian = jax.jacfwd(measurement_device)(point)
-            innovation_covariance = measurement_jacobian @ ensemble_covariance @ measurement_jacobian.T + measurement_device_covariance
-            kalman_gain = ensemble_covariance @ measurement_jacobian.T @ jnp.linalg.inv(innovation_covariance)
-            point = point + (kalman_gain @ jnp.atleast_2d(measurement - point_measurement)).reshape(-1)
+            innovation_covariance = (
+                measurement_jacobian @ ensemble_covariance @ measurement_jacobian.T
+                + measurement_device_covariance
+            )
+            kalman_gain = (
+                ensemble_covariance
+                @ measurement_jacobian.T
+                @ jnp.linalg.inv(innovation_covariance)
+            )
+            point = point + (
+                kalman_gain @ jnp.atleast_2d(measurement - point_measurement)
+            ).reshape(-1)
             return point
 
         keys = jax.random.split(key, ensemble.shape[0])
@@ -161,13 +226,14 @@ def bruenkf_update(key, ensemble, measurement, measurement_device_covariance, me
     updated_ensemble = jax.lax.fori_loop(0, num_bruf_steps, bruf_update, ensemble)
     return updated_ensemble
 
+
 @partial(jax.jit, static_argnames=["ensemble_size", "debug"])
 def filter_experiment(
-        ensemble_update_method,
-        ensemble_size,
-        ensemble_initialization_key,
-        measurement_device_covariance,
-        debug=False,
+    ensemble_update_method,
+    ensemble_size,
+    ensemble_initialization_key,
+    measurement_device_covariance,
+    debug=False,
 ):
     """
     Same signature as your original function, but uses lax.scan instead
@@ -187,7 +253,9 @@ def filter_experiment(
 
     # Initialize the true state
     true_state_init = jnp.array([[1.25, 0.0]])
-    measurement_device = jax.tree_util.Partial(norm_measurement, covariance=measurement_covariance)
+    measurement_device = jax.tree_util.Partial(
+        norm_measurement, covariance=measurement_covariance
+    )
 
     # Initialize the ensemble
     key = ensemble_initialization_key
@@ -199,7 +267,7 @@ def filter_experiment(
         cov=(1 / 4) * jnp.eye(2),
     )
 
-    #filter_ensemble_init = generate(subkey, batch_size=ensemble_size)
+    # filter_ensemble_init = generate(subkey, batch_size=ensemble_size)
 
     filter_update = jax.tree_util.Partial(
         ensemble_update_method,
@@ -207,9 +275,9 @@ def filter_experiment(
         measurement_device_covariance=measurement_device_covariance,
     )
 
-    #-------------------------------------------
+    # -------------------------------------------
     # single iteration of the filter
-    #-------------------------------------------
+    # -------------------------------------------
     def scan_step(carry, step_idx):
         """
         carry = (key, ensemble, true_state)
@@ -225,9 +293,8 @@ def filter_experiment(
             debug=debug,  # or True if you want
         )
 
-        is_measurement_phase = (step_idx >= burn_in_time)
+        is_measurement_phase = step_idx >= burn_in_time
         error = (true_state - jnp.mean(updated_ensemble, axis=0)) * is_measurement_phase
-
 
         ensemble_next = ikeda_forward(updated_ensemble)
         true_state_next = ikeda_forward(true_state)
@@ -258,7 +325,9 @@ ensemble = jax.random.multivariate_normal(
 from data_science_utils.measurement_functions import norm_measurement
 
 measurement_covariance = jnp.array([[0.25]])
-measurement_device = jax.tree_util.Partial(norm_measurement, covariance=measurement_covariance)
+measurement_device = jax.tree_util.Partial(
+    norm_measurement, covariance=measurement_covariance
+)
 
 key, subkey = jax.random.split(key)
 measurement = measurement_device(state=true_state, key=jax.random.key(100))
@@ -280,7 +349,10 @@ ensemble_update_methods = [
     # jax.tree_util.Partial(engmf_update, bandwidth=jax.tree_util.Partial(silverman_bandwidth, scale=3 / 3)),
     # jax.tree_util.Partial(di_engmf_update, bandwidth=jax.tree_util.Partial(silverman_bandwidth, scale=1 / 3)),
     # jax.tree_util.Partial(di_engmf_update, bandwidth=jax.tree_util.Partial(silverman_bandwidth, scale=2 / 3)),
-    jax.tree_util.Partial(di_engmf_update, bandwidth=jax.tree_util.Partial(silverman_bandwidth, scale=3 / 3)),
+    jax.tree_util.Partial(
+        di_engmf_update,
+        bandwidth=jax.tree_util.Partial(silverman_bandwidth, scale=3 / 3),
+    ),
     # jax.tree_util.Partial(enkf_update, inflation_factor=1.01),
     # jax.tree_util.Partial(bruenkf_update, inflation_factor=1.01, num_bruf_steps=5),
 ]
@@ -292,11 +364,10 @@ key = jax.random.key(42)
 key, *ensemble_keys = jax.random.split(key, 1 + 32)
 
 measurement_covariances = [
-    jnp.array([[0.5 ** 2]]),
-    jnp.array([[1.0 ** 2]]),
-    jnp.array([[2.0 ** 2]]),
+    jnp.array([[0.5**2]]),
+    jnp.array([[1.0**2]]),
+    jnp.array([[2.0**2]]),
 ]
-
 
 
 product_list = list(
@@ -312,12 +383,25 @@ from tqdm import tqdm
 
 records = []
 for ensemble_size, measurement_covariance, ensemble_update_method in tqdm(product_list):
-    
-    print(ensemble_size, measurement_covariance.item(), ensemble_update_method.func.__name__, ensemble_update_method.keywords)
-    rmse = jax.vmap(lambda key: filter_experiment(ensemble_update_method, ensemble_size, key, measurement_covariance))(jnp.array(ensemble_keys))
-    records.append({'ensemble_size':ensemble_size,
-                    'measurement_covariance':measurement_covariance.item(),
-                    'update_method':ensemble_update_method.func.__name__,
-                    'keywords':ensemble_update_method.keywords,
-                    'rmse':rmse})
+
+    print(
+        ensemble_size,
+        measurement_covariance.item(),
+        ensemble_update_method.func.__name__,
+        ensemble_update_method.keywords,
+    )
+    rmse = jax.vmap(
+        lambda key: filter_experiment(
+            ensemble_update_method, ensemble_size, key, measurement_covariance
+        )
+    )(jnp.array(ensemble_keys))
+    records.append(
+        {
+            "ensemble_size": ensemble_size,
+            "measurement_covariance": measurement_covariance.item(),
+            "update_method": ensemble_update_method.func.__name__,
+            "keywords": ensemble_update_method.keywords,
+            "rmse": rmse,
+        }
+    )
     print(rmse)

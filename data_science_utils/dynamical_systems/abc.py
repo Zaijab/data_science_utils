@@ -26,13 +26,13 @@ class AbstractDynamicalSystem(eqx.Module, strict=True):
         """Propagate the state forward in time."""
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def backward(
-        self,
-        x: Float[Array, "*batch state_dim"],
-    ) -> Float[Array, "*batch state_dim"]:
-        """Propagate the state backward in time."""
-        raise NotImplementedError
+    # @abc.abstractmethod
+    # def backward(
+    #     self,
+    #     x: Float[Array, "*batch state_dim"],
+    # ) -> Float[Array, "*batch state_dim"]:
+    #     """Propagate the state backward in time."""
+    #     raise NotImplementedError
 
     @abc.abstractmethod
     def generate(

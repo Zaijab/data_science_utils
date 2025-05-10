@@ -8,7 +8,7 @@ from beartype import beartype as typechecker
 from jax import lax
 from jaxtyping import Array, Bool, Float, Key, jaxtyped
 import equinox as eqx
-
+from data_science_utils.measurement_systems import AbstractMeasurementSystem
 from data_science_utils.dynamical_systems import ikeda_attractor_discriminator
 
 
@@ -278,3 +278,15 @@ def discriminator_ensemble_gaussian_mixture_filter_update_ensemble(
     #     assert isinstance(posterior_weights, Float[Array, "batch_dim"])
 
     return posterior_samples
+
+
+@jaxtyped(typechecker=typechecker)
+@eqx.filter_jit
+def diengmf_update(
+    key: Key[Array, "..."],
+    ensemble: Float[Array, "batch_size state_dim"],
+    measurement: Float[Array, "measurement_dim"],
+    measurement_system: AbstractMeasurementSystem,
+    debug: bool = False,
+) -> Float[Array, "batch_size state_dim"]:
+    pass

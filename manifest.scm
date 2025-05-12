@@ -18,7 +18,9 @@
 	     (gnu packages python-science)
 	     (gnu packages machine-learning)
 	     (guix-science packages python)
-	     (guix-science packages machine-learning))
+	     (guix-science packages machine-learning)
+	     (guix-science-nonfree packages machine-learning)
+	     )
 
 (define-public python-jaxtyping-three
   (package
@@ -691,4 +693,5 @@ setuptools.setup(
 		     python-optimistix
 		     python-diffrax
 		     python-waymax
-		     python-evosax))
+		     python-evosax
+		     python-tensorboard))

@@ -11,3 +11,7 @@ from data_science_utils.dynamical_systems.ikeda import (
 from data_science_utils.dynamical_systems.lorenz96 import (
     Lorenz96 as Lorenz96,
 )
+
+from data_science_utils.dynamical_systems.lorenz63 import (
+    Lorenz63 as Lorenz63,
+)

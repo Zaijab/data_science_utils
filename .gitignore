@@ -7,3 +7,5 @@ profile_default/*
 **/__pycache__/
 **/results/
 .mypy_cache
+logs/*
+mlruns/*

@@ -77,13 +77,16 @@ def ikeda_attractor_discriminator(
 
 
 class Ikeda(AbstractDynamicalSystem, strict=True):
-    n_inverses: int = 10
     u: float = 0.9
     batch_size: int = 10**3
 
     @property
     def dimension(self):
         return 2
+
+    @property
+    def time_step(self):
+        return 1
 
     @property
     def initial_state(self):
@@ -106,4 +109,4 @@ class Ikeda(AbstractDynamicalSystem, strict=True):
         key: Key[Array, "1"],
         batch_size: int = batch_size,
     ) -> Float[Array, "{batch_size} 2"]:
-        return ikeda_generate(key, batch_size)
+        return ikeda_generate(key, batch_size, u=self.u)

@@ -10,13 +10,20 @@
 	     (gnu packages image-processing)
 	     (gnu packages python)
 	     (gnu packages jupyter)
+	     (gnu packages databases)
+	     (gnu packages docker)
+	     (gnu packages python-web)
+	     (gnu packages protobuf)
+	     (gnu packages markup)
 	     (gnu packages check)
 	     (gnu packages version-control)
 	     (gnu packages python-xyz)
 	     (gnu packages python-check)
+	     (gnu packages python-compression)
 	     (gnu packages pdf)
 	     (gnu packages python-science)
 	     (gnu packages machine-learning)
+	     (gnu packages graph)
 	     (guix-science packages python)
 	     (guix-science packages machine-learning)
 	     (guix-science-nonfree packages machine-learning)
@@ -674,6 +681,350 @@ setuptools.setup(
     (license #f)))
 
 
+(define-public python-opentelemetry-api
+  (package
+    (name "python-opentelemetry-api")
+    (version "1.33.0")
+    (source
+     (origin
+       (method url-fetch)
+       (uri (pypi-uri "opentelemetry_api" version))
+       (sha256
+        (base32 "1vccsn9rs43mcy0krjiqnqp4y7zd8hcai3l25asxr9vd5vyq0hyc"))))
+    (build-system pyproject-build-system)
+    (arguments (list #:tests? #f))
+    (propagated-inputs (list python-deprecated python-importlib-metadata))
+    (native-inputs (list python-hatchling))
+    (home-page #f)
+    (synopsis "Linear solvers in JAX and Equinox.")
+    (description "Linear solvers in JAX and Equinox.")
+    (license #f)))
+
+(define-public python-opentelemetry-semantic-conventions
+  (package
+    (name "python-opentelemetry-semantic-conventions")
+    (version "0.54b0")
+    (source
+     (origin
+       (method url-fetch)
+       (uri (pypi-uri "opentelemetry_semantic_conventions" version))
+       (sha256
+        (base32 "1jd90bz10pd315bkqplx158xnp2k68vgfsdgy6d0gjxxfycp6ys6"))))
+    (build-system pyproject-build-system)
+    (arguments (list #:tests? #f))
+    (propagated-inputs (list python-deprecated python-opentelemetry-api))
+    (native-inputs (list python-hatchling))
+    (home-page #f)
+    (synopsis "Linear solvers in JAX and Equinox.")
+    (description "Linear solvers in JAX and Equinox.")
+    (license #f)))
+
+
+(define-public python-opentelemetry-sdk
+  (package
+    (name "python-opentelemetry-sdk")
+    (version "1.33.0")
+    (source
+     (origin
+       (method url-fetch)
+       (uri (pypi-uri "opentelemetry_sdk" version))
+       (sha256
+        (base32 "0s6cjyvjcfns0mxj2b525ixrdwfkb4dx493b6768y8bvw38mdz57"))))
+    (build-system pyproject-build-system)
+    (arguments (list #:tests? #f))
+    (propagated-inputs (list python-opentelemetry-api
+			     python-opentelemetry-semantic-conventions
+			     python-typing-extensions))
+    (native-inputs (list python-hatchling))
+    (home-page #f)
+    (synopsis "Linear solvers in JAX and Equinox.")
+    (description "Linear solvers in JAX and Equinox.")
+    (license #f)))
+
+(define-public python-databricks-sdk
+  (package
+    (name "python-databricks-sdk")
+    (version "0.53.0")
+    (source
+     (origin
+       (method url-fetch)
+       (uri (pypi-uri "databricks_sdk" version))
+       (sha256
+        (base32 "1dswlk9z6i1mfxinf0vcxff5dgbb1qk5gy374yx10v7jhkan64jh"))))
+    (build-system pyproject-build-system)
+    (arguments (list #:tests? #f))
+    (propagated-inputs (list python-requests python-google-auth))
+    (native-inputs (list python-wheel python-setuptools))
+    (home-page #f)
+    (synopsis "Linear solvers in JAX and Equinox.")
+    (description "Linear solvers in JAX and Equinox.")
+    (license #f)))
+
+
+(define-public python-mlflow-skinny
+  (package
+    (name "python-mlflow-skinny")
+    (version "2.22.0")
+    (source
+     (origin
+       (method url-fetch)
+       (uri (pypi-uri "mlflow_skinny" version))
+       (sha256
+        (base32 "1kkwhpv0claf1gkvvhw20qwzqf3hdga39nbc9180d69q02bmhjvp"))))
+    (build-system pyproject-build-system)
+    (arguments (list #:tests? #f))
+    (propagated-inputs (list python-cachetools
+			     python-click
+			     python-cloudpickle
+			     python-databricks-sdk
+			     python-fastapi
+			     python-gitpython
+			     python-importlib-metadata-6
+
+			     python-opentelemetry-api
+			     python-opentelemetry-sdk
+
+			     python-packaging
+			     python-protobuf
+			     python-pydantic
+			     python-pyyaml
+			     python-requests
+			     python-sqlparse
+			     python-typing-extensions
+			     python-uvicorn			     
+			     
+			     python-alembic
+			     python-docker
+			     python-flask
+			     python-numpy
+			     python-scipy
+			     python-pandas
+			     python-sqlalchemy
+			     gunicorn
+
+
+			     python-scikit-learn
+			     python-pyarrow
+			     markdown
+			     python-jinja2
+			     python-matplotlib
+			     python-graphene
+			     
+			     
+			     
+
+			     python-pyyaml
+			     python-pydantic
+			     python-protobuf
+			     python-packaging
+			     python-databricks-cli))
+    (home-page #f)
+    (synopsis "Linear solvers in JAX and Equinox.")
+    (description "Linear solvers in JAX and Equinox.")
+    (license #f)))
+
+
+;; (define-public python-mlflow
+;;   (package
+;;     (name "python-mlflow")
+;;     (version "2.22.0")
+;;     (source
+;;      (origin
+;;        (method url-fetch)
+;;        (uri (pypi-uri "mlflow" version))
+;;        (sha256
+;;         (base32 "11sggql1scih5vddm7d6yj6sb86h7vrm8c5187a2l6vw82l811sv"))))
+;;     (build-system pyproject-build-system)
+;;     (arguments (list #:tests? #f))
+;;     (propagated-inputs (list python-alembic
+;; 			     python-docker
+;; 			     python-flask
+;; 			     python-numpy
+;; 			     python-scipy
+;; 			     python-pandas
+;; 			     python-sqlalchemy
+;; 			     gunicorn
+;; 			     python-uvicorn
+;; 			     python-scikit-learn
+;; 			     python-pyarrow
+;; 			     markdown
+;; 			     python-jinja2
+;; 			     python-matplotlib
+;; 			     python-graphene
+;; 			     ))
+;;     (home-page #f)
+;;     (synopsis "Linear solvers in JAX and Equinox.")
+;;     (description "Linear solvers in JAX and Equinox.")
+;;     (license #f)))
+
+(define* (pypi-wheel-url name version #:optional (dist "py3") (python "py3") (abi "none") (platform "any"))
+  (string-append
+    "https://files.pythonhosted.org/packages"
+    "/" dist
+    "/" (string-take name 1)
+    "/" name
+    "/" name "-" version "-" python "-" abi "-" platform ".whl"))
+
+;; This package is a stop-gap that builds Tensorboard from the pre-built wheels, instead of
+;; packaging it from scratch, which requires a Bazel+NPM build
+(define-public python-mlflow-wheel
+  (package
+    (name "python-mlflow")
+    (version "2.22.0")
+    (build-system pyproject-build-system)
+    (source
+     (origin
+       (method url-fetch)
+       (uri (pypi-wheel-url "mlflow" version))
+       (sha256
+        (base32 "0llvpjjxgipxnzd9v25mhc5izm01nzgav6xac31q3cypkgip5nis"))
+       (file-name (string-append name "-" version ".whl"))))
+    (arguments
+     (list
+      #:tests? #f ;Tests are not distributed with the wheel
+      #:phases #~(modify-phases %standard-phases
+                   (replace 'build
+                     (lambda* (#:key source #:allow-other-keys)
+                       (mkdir-p "dist")
+                       (install-file source "dist"))))))
+    
+    (propagated-inputs (list python-cachetools
+			     python-click
+			     python-cloudpickle
+			     python-databricks-sdk
+			     python-fastapi
+			     python-gitpython
+			     python-importlib-metadata-6
+
+			     python-opentelemetry-api
+			     python-opentelemetry-sdk
+
+			     python-packaging
+			     python-protobuf
+			     python-pydantic
+			     python-pyyaml
+			     python-requests
+			     python-sqlparse
+			     python-typing-extensions
+			     python-uvicorn			     
+			     
+			     python-alembic
+			     python-docker
+			     python-flask
+			     python-numpy
+			     python-scipy
+			     python-pandas
+			     python-sqlalchemy
+			     gunicorn
+
+
+			     python-scikit-learn
+			     python-pyarrow
+			     markdown
+			     python-jinja2
+			     python-matplotlib
+			     python-graphene
+			     python-mlflow-skinny
+			     
+			     
+			     
+
+			     python-pyyaml
+			     python-pydantic
+			     python-protobuf
+			     python-packaging
+			     python-databricks-cli))
+    
+    (home-page "https://www.tensorflow.org")
+    (synopsis "Fast data loading for TensorBoard")
+    (description
+     "The Tensorboard Data Server is the backend component of TensorBoard that efficiently processes
+and serves log data. It improves TensorBoard's performance by handling large-scale event files
+asynchronously, enabling faster data loading and reduced memory usage.")
+    (license license:asl2.0)))
+
+;; This package is a stop-gap that builds Tensorboard from the pre-built wheels, instead of
+;; packaging it from scratch, which requires a Bazel+NPM build
+(define-public python-jax-wheel
+  (package
+    (name "python-mlflow")
+    (version "2.22.0")
+    (build-system pyproject-build-system)
+    (source
+     (origin
+       (method url-fetch)
+       (uri (pypi-wheel-url "mlflow" version))
+       (sha256
+        (base32 "0llvpjjxgipxnzd9v25mhc5izm01nzgav6xac31q3cypkgip5nis"))
+       (file-name (string-append name "-" version ".whl"))))
+    (arguments
+     (list
+      #:tests? #f ;Tests are not distributed with the wheel
+      #:phases #~(modify-phases %standard-phases
+                   (replace 'build
+                     (lambda* (#:key source #:allow-other-keys)
+                       (mkdir-p "dist")
+                       (install-file source "dist"))))))
+    
+    (home-page "https://www.tensorflow.org")
+    (synopsis "Fast data loading for TensorBoard")
+    (description
+     "The Tensorboard Data Server is the backend component of TensorBoard that efficiently processes
+and serves log data. It improves TensorBoard's performance by handling large-scale event files
+asynchronously, enabling faster data loading and reduced memory usage.")
+    (license license:asl2.0)))
+
+
+(define-public python-importlib-metadata-6
+  (package
+    (name "python-importlib-metadata")
+    (version "6.5.0")
+    (source
+     (origin
+       (method url-fetch)
+       (uri (pypi-uri "importlib_metadata" version))
+       (sha256
+        (base32
+         "0i808qj8ci40qnps9fr63fj4yszzwzk9kjgvbizjj9m7qcdxz2vs"))))
+    (build-system python-build-system)
+    (arguments
+     (list
+      #:phases
+      #~(modify-phases %standard-phases
+          ;; XXX: PEP 517 manual build/install procedures copied from
+          ;; python-isort.
+          (replace 'build
+            (lambda _
+              ;; ZIP does not support timestamps before 1980.
+              (setenv "SOURCE_DATE_EPOCH" "315532800")
+              (invoke "python" "-m" "build" "--wheel" "--no-isolation" ".")))
+          (replace 'install
+            (lambda* (#:key outputs #:allow-other-keys)
+              (let ((whl (car (find-files "dist" "\\.whl$"))))
+                (invoke "pip" "--no-cache-dir" "--no-input"
+                        "install" "--no-deps" "--prefix" #$output whl))))
+          (replace 'check
+            (lambda* (#:key tests? #:allow-other-keys)
+              (when tests?
+                (invoke "pytest" "-vv" "tests")))))))
+    (propagated-inputs (list python-zipp))
+    (native-inputs
+     (list python-pypa-build
+           python-pyfakefs
+           python-pytest
+           python-setuptools-scm))
+    (home-page "https://importlib-metadata.readthedocs.io/")
+    (synopsis "Read metadata from Python packages")
+    (description
+     "@code{importlib_metadata} is a library which provides an API for
+accessing an installed Python package's metadata, such as its entry points or
+its top-level name.  This functionality intends to replace most uses of
+@code{pkg_resources} entry point API and metadata API.  Along with
+@code{importlib.resources} in Python 3.7 and newer, this can eliminate the
+need to use the older and less efficient @code{pkg_resources} package.")
+    (license license:asl2.0)))
+
+
 (packages->manifest (list
 		     python
 		     jupyter
@@ -694,4 +1045,11 @@ setuptools.setup(
 		     python-diffrax
 		     python-waymax
 		     python-evosax
-		     python-tensorboard))
+		     python-databricks-sdk
+		     python-opentelemetry-api
+		     python-opentelemetry-semantic-conventions
+		     python-opentelemetry-sdk
+		     python-mlflow-wheel
+		     python-sqlparse
+		     python-tensorboard
+		     python-plotly))

@@ -95,7 +95,7 @@ def plot_dynamical_system(
         axes_time = [fig.add_subplot(111)]
 
     # Generate state trajectories
-    key = jax.random.PRNGKey(seed)
+    key = jax.random.key(seed)
     keys = jax.random.split(key, n_trajectories)
 
     all_states = []
@@ -109,6 +109,7 @@ def plot_dynamical_system(
             states.append(state)
 
         trajectory = jnp.concatenate(states, axis=0)
+        print(trajectory)
         all_states.append(trajectory)
 
     all_states = jnp.stack(all_states, axis=0)  # [n_traj, n_steps+1, dim]

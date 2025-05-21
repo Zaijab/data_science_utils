@@ -1,16 +1,18 @@
 from data_science_utils.dynamical_systems.abc import (
     AbstractDynamicalSystem as AbstractDynamicalSystem,
+    AbstractDiscreteSystem as AbstractDiscreteSystem,
+    AbstractInvertibleDiscreteSystem as AbstractInvertibleDiscreteSystem,
+    AbstractContinuousSystem as AbstractContinuousSystem,
 )
-
 
 from data_science_utils.dynamical_systems.ikeda import (
     Ikeda as Ikeda,
     ikeda_attractor_discriminator as ikeda_attractor_discriminator,
 )
 
-from data_science_utils.dynamical_systems.lorenz96 import (
-    Lorenz96 as Lorenz96,
-)
+# from data_science_utils.dynamical_systems.lorenz96 import (
+#     Lorenz96 as Lorenz96,
+# )
 
 from data_science_utils.dynamical_systems.lorenz63 import (
     Lorenz63 as Lorenz63,

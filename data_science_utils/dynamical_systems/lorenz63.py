@@ -1,13 +1,10 @@
-from functools import partial
-
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 from beartype import beartype as typechecker
 from diffrax import ConstantStepSize, ODETerm, SaveAt, Tsit5, diffeqsolve
 from data_science_utils.dynamical_systems import AbstractDynamicalSystem
-from jax import lax, random
-from jaxtyping import Array, Bool, Float, Key, jaxtyped
+from jaxtyping import Array, Float, Key, jaxtyped
 
 
 class Lorenz63(AbstractDynamicalSystem, strict=True):
@@ -20,13 +17,25 @@ class Lorenz63(AbstractDynamicalSystem, strict=True):
     def dimension(self):
         return 3
 
+    @eqx.filter_jit
     def initial_state(
         self,
-        key: Key[Array, ...] | None = None,
+        key: Key[Array, "..."] | None = None,
         **kwargs,
     ) -> Float[Array, "state_dim"]:
-        return jnp.array([8.0, 0.0, 0.0])
+        state = jnp.array([8.0, 0.0, 0.0])
 
+        noise = (
+            0
+            if key is None
+            else jax.random.multivariate_normal(
+                key, shape=(1,), mean=state, cov=jnp.eye(self.dimension)
+            )
+        )
+
+        return state + noise
+
+    @eqx.filter_jit
     def vector_field(self, t, y, args):
         x, y, z = y
         dx = self.sigma * (y - x)
@@ -36,12 +45,13 @@ class Lorenz63(AbstractDynamicalSystem, strict=True):
 
     @jaxtyped(typechecker=typechecker)
     @eqx.filter_jit
-    def forward(
+    def trajectory(
         self,
-        x: Float[Array, "3"],
-        t1: float = 1.0,
-        saveat: SaveAt = SaveAt(t1=True),
-    ) -> Float[Array, "3"]:
+        initial_time: float,
+        final_time: float,
+        state: Float[Array, "3"],
+        saveat: SaveAt,
+    ) -> tuple[Float[Array, "..."], Float[Array, "... 3"]]:
         """Integrate a single point forward in time."""
         term = ODETerm(self.vector_field)
         solver = Tsit5()
@@ -49,24 +59,22 @@ class Lorenz63(AbstractDynamicalSystem, strict=True):
         sol = diffeqsolve(
             term,
             solver,
-            t0=0,
-            t1=t1,
+            t0=initial_time,
+            t1=final_time,
             dt0=self.dt,
-            y0=x,
+            y0=state,
             stepsize_controller=ConstantStepSize(),
             saveat=saveat,
             max_steps=100_000,
         )
-        return sol.ys
+        return sol.ts, sol.ys
 
     @jaxtyped(typechecker=typechecker)
     @eqx.filter_jit
     def generate(
         self, key: Key[Array, "..."], batch_size: int = 1000, spin_up_steps: int = 100
     ) -> Float[Array, "{batch_size} 3"]:
-
-        initial_states = jnp.ones((batch_size, 3)) * jnp.array([8.0, 1.0, 1.0])
-        initial_states = initial_states + 5 * random.normal(key, shape=(batch_size, 3))
-        final_states = eqx.filter_vmap(self.forward)(initial_states, spin_up_steps)
-
+        keys = jax.random.split(key, batch_size)
+        initial_states = eqx.filter_vmap(self.initial_state)(keys)
+        final_states = eqx.filter_vmap(self.flow)(0, 30, initial_states)
         return final_states

@@ -12,16 +12,16 @@ def test_ikeda_generate() -> None:
 
 def test_ikeda_initial_state() -> None:
     system = Ikeda()
-    assert system.initial_state.ndim == 1
-    assert system.initial_state.shape == (2,)
+    assert system.initial_state().ndim == 1
+    assert system.initial_state().shape == (2,)
 
 
 def test_ikeda_forward() -> None:
     system = Ikeda()
-    initial_state = system.initial_state
+    initial_state = system.initial_state()
     initial_state = system.forward(initial_state)
-    assert system.initial_state.ndim == 1
-    assert system.initial_state.shape == (2,)
+    assert system.initial_state().ndim == 1
+    assert system.initial_state().shape == (2,)
 
     batch = system.generate(jax.random.key(0))
     batch = system.forward(batch)

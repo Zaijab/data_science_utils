@@ -9,3 +9,4 @@ profile_default/*
 .mypy_cache
 logs/*
 mlruns/*
+old_tests/*

@@ -18,6 +18,7 @@ def norm_measurement(
     return (perfect_measurement + noise).reshape(-1)
 
 
+@jaxtyped(typechecker=typechecker)
 class RangeSensor(AbstractMeasurementSystem):
     covariance: Float[Array, "1 1"]
 

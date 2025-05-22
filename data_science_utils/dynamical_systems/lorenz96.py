@@ -1,11 +1,21 @@
 from functools import partial
-
+from typing import Any
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 from beartype import beartype as typechecker
+from diffrax import (
+    AbstractSolver,
+    AbstractStepSizeController,
+    ConstantStepSize,
+    Tsit5,
+)
 from jaxtyping import Array, Float, Key, jaxtyped
-import equinox as eqx
-from data_science_utils.dynamical_systems import AbstractDynamicalSystem
+
+from data_science_utils.dynamical_systems import (
+    AbstractContinuousDynamicalSystem,
+    AbstractDynamicalSystem,
+)
 
 
 @jaxtyped(typechecker=typechecker)
@@ -74,43 +84,49 @@ def lorenz96_generate(
     return final_states
 
 
-class Lorenz96(AbstractDynamicalSystem, strict=True):
+class Lorenz96(AbstractContinuousDynamicalSystem, strict=True):
     F: float = 8.0
     dt: float = 0.05
     steps: int = 12
     dim: int = 40
-    batch_size: int = 1000
-    spin_up_steps: int = 100
+    solver: AbstractSolver = Tsit5()
+    stepsize_contoller: AbstractStepSizeController = ConstantStepSize()
 
     @property
     def dimension(self):
         return self.dim
 
-    @property
-    def initial_state(self):
-        # Standard initial state with a small perturbation on one component
-        state = jnp.ones(self.dim)  # * self.F
-        state = state.at[0].set(state[0] + 0.01)
-        return state
-
-    def forward(
+    @eqx.filter_jit
+    def initial_state(
         self,
-        x: Float[Array, "*batch {self.dim}"],
-    ) -> Float[Array, "*batch {self.dim}"]:
-        return lorenz96_forward(x, F=self.F, dt=self.dt, steps=self.steps)
-
-    def generate(
-        self,
-        key: Key[Array, "..."],
-        batch_size: int = None,
-    ) -> Float[Array, "{batch_size} {self.dim}"]:
-        actual_batch_size = self.batch_size if batch_size is None else batch_size
-        return lorenz96_generate(
-            key,
-            batch_size=actual_batch_size,
-            dim=self.dim,
-            F=self.F,
-            spin_up_steps=self.spin_up_steps,
-            dt=self.dt,
-            steps=self.steps,
+        key: Key[Array, "..."] | None = None,
+        **kwargs,
+    ) -> Float[Array, "state_dim"]:
+        state = jnp.full(self.dim, self.F).at[0].add(0.01)
+        noise = (
+            0
+            if key is None
+            else jax.random.multivariate_normal(
+                key, shape=(1,), mean=state, cov=jnp.eye(self.dimension)
+            )
         )
+
+        return state + noise
+
+    @jaxtyped(typechecker=typechecker)
+    @eqx.filter_jit
+    def vector_field(
+        self,
+        t,
+        x: Float[Array, "dim"],
+        args: Any,
+    ) -> Float[Array, "dim"]:
+        """Compute the derivatives for the Lorenz 96 model."""
+
+        x_plus_1 = jnp.roll(x, shift=-1, axis=-1)  # X_{i+1}
+        x_minus_1 = jnp.roll(x, shift=1, axis=-1)  # X_{i-1}
+        x_minus_2 = jnp.roll(x, shift=2, axis=-1)  # X_{i-2}
+
+        derivatives = (x_plus_1 - x_minus_2) * x_minus_1 - x + self.F
+
+        return derivatives

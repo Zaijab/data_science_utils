@@ -1,6 +1,8 @@
+import jax
+import jax.numpy as jnp
 import equinox as eqx
 import abc
-from jaxtyping import Array, Float, Key
+from jaxtyping import Array, Float, Key, jaxtyped
 from beartype import beartype as typechecker
 from diffrax import (
     SaveAt,
@@ -79,10 +81,18 @@ class AbstractDynamicalSystem(eqx.Module, strict=True):
         _, states = self.trajectory(initial_time, final_time, state, saveat)
         return states
 
+    @jaxtyped(typechecker=typechecker)
+    @eqx.filter_jit
+    def generate(
+        self, key: Key[Array, "..."], batch_size: int = 1000, final_time: int = 100
+    ) -> Float[Array, "{batch_size} state_dim"]:
+        keys = jax.random.split(key, batch_size)
+        initial_states = eqx.filter_vmap(self.initial_state)(keys)
+        final_states = eqx.filter_vmap(self.flow)(0, final_time, initial_states)
+        return final_states
 
-class AbstractContinuousSystem(AbstractDynamicalSystem, strict=True):
-    solver: AbstractSolver
-    stepsize_contoller: AbstractStepSizeController
+
+class AbstractContinuousDynamicalSystem(AbstractDynamicalSystem, strict=True):
 
     @abc.abstractmethod
     def vector_field():
@@ -100,7 +110,7 @@ class AbstractContinuousSystem(AbstractDynamicalSystem, strict=True):
         """Integrate a single point forward in time."""
 
         sol = diffeqsolve(
-            term=ODETerm(self.vector_field),
+            terms=ODETerm(self.vector_field),
             solver=self.solver,
             t0=initial_time,
             t1=final_time,
@@ -113,7 +123,7 @@ class AbstractContinuousSystem(AbstractDynamicalSystem, strict=True):
         return sol.ts, sol.ys
 
 
-class AbstractDiscreteSystem(AbstractDynamicalSystem, strict=True):
+class AbstractDiscreteDynamicalSystem(AbstractDynamicalSystem, strict=True):
 
     @abc.abstractmethod
     def forward():
@@ -126,7 +136,6 @@ class AbstractDiscreteSystem(AbstractDynamicalSystem, strict=True):
         final_time: float,
         state: Float[Array, "state_dim"],
         saveat: SaveAt,
-        discrete_update: callable,
     ):
         """
         This function computes the trajectory for a discrete system.
@@ -170,7 +179,7 @@ class AbstractDiscreteSystem(AbstractDynamicalSystem, strict=True):
         return xs, states
 
 
-class AbstractInvertibleDiscreteSystem(AbstractDynamicalSystem, strict=True):
+class AbstractInvertibleDiscreteDynamicalSystem(AbstractDynamicalSystem, strict=True):
 
     @abc.abstractmethod
     def forward():
@@ -182,17 +191,17 @@ class AbstractInvertibleDiscreteSystem(AbstractDynamicalSystem, strict=True):
 
     @eqx.filter_jit
     def trajectory(
+        self,
         initial_time: float,
         final_time: float,
         state: Float[Array, "state_dim"],
         saveat: SaveAt,
-        discrete_update: callable,
     ):
         """
         This function computes the trajectory for a discrete system.
         It returns the tuple of the times and
         """
-        step_function = self.forward if final_time >= initial_time else self.backward
+        is_forward = final_time >= initial_time
 
         safe_initial_time = (
             jnp.atleast_1d(initial_time) if saveat.subs.t0 else jnp.array([])
@@ -202,6 +211,7 @@ class AbstractInvertibleDiscreteSystem(AbstractDynamicalSystem, strict=True):
         )
         safe_array = jnp.array([]) if saveat.subs.ts is None else saveat.subs.ts
         xs = jnp.concatenate([safe_initial_time, safe_array, safe_final_time])
+        xs = jnp.sort(xs) if is_forward else jnp.sort(xs)[::-1]
 
         def body_fn(carry, x):
             """
@@ -212,11 +222,14 @@ class AbstractInvertibleDiscreteSystem(AbstractDynamicalSystem, strict=True):
 
             def sub_while_cond_fun(sub_carry):
                 sub_state, sub_time = sub_carry
-                return sub_time < x
+                return sub_time < x if is_forward else sub_time > x
 
             def sub_while_body_fun(sub_carry):
                 sub_state, sub_time = sub_carry
-                return (self.forward(sub_state), sub_time + 1)
+                if is_forward:
+                    return (self.forward(sub_state), sub_time + 1)
+                else:
+                    return (self.backward(sub_state), sub_time - 1)
 
             final_state, final_time = jax.lax.while_loop(
                 sub_while_cond_fun, sub_while_body_fun, carry
@@ -224,7 +237,7 @@ class AbstractInvertibleDiscreteSystem(AbstractDynamicalSystem, strict=True):
 
             return (final_state, final_time), final_state
 
-        initial_carry = (state, 0)
+        initial_carry = (state, initial_time)
         (final_state, final_time), states = jax.lax.scan(body_fn, initial_carry, xs)
 
         return xs, states

@@ -1,7 +1,0 @@
-import jax
-import matplotlib.pyplot as plt
-from data_science_utils.dynamical_systems import Ikeda
-
-system = Ikeda()
-attractor = system.generate(jax.random.key(0))
-plt.scatter(attractor[:, 0], attractor[:, 1])

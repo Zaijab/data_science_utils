@@ -5,7 +5,7 @@ from collections.abc import Callable
 from jaxtyping import jaxtyped, Float, Array, Key
 from beartype import beartype as typechecker
 from data_science_utils.dynamical_systems import AbstractDynamicalSystem
-from data_science_utils.measurement_functions import AbstractMeasurementSystem
+from data_science_utils.measurement_systems import AbstractMeasurementSystem
 import matplotlib.pyplot as plt
 
 
@@ -34,18 +34,16 @@ def filter_update(
     (prior_ensemble, true_state) = carry
     ensemble_updating_key, measurement_key = jax.random.split(key)
     updated_ensemble = update(
-        ensemble=prior_ensemble,
-        measurement=measurement_system(state=true_state, key=measurement_key),
+        prior_ensemble=prior_ensemble,
+        measurement=measurement_system(true_state, measurement_key),
         measurement_system=measurement_system,
         key=ensemble_updating_key,
-        debug=debug,
     )
     error = true_state - jnp.mean(updated_ensemble, axis=0)
     if debug:
-        # jax.debug.print("Hello")
         jax.debug.callback(plot_update, prior_ensemble, updated_ensemble, true_state)
-    ensemble_next = dynamical_system.forward(updated_ensemble)
-    true_state_next = dynamical_system.forward(true_state)
+    ensemble_next = eqx.filter_vmap(dynamical_system.flow)(0.0, 1.0, updated_ensemble)
+    true_state_next = dynamical_system.flow(0.0, 1.0, true_state)
     new_carry = (ensemble_next, true_state_next)
     return new_carry, error
 
@@ -62,7 +60,6 @@ def evaluate_filter(
             Float[Array, "batch_size state_dim"],
             Float[Array, "measurement_dim"],
             AbstractMeasurementSystem,
-            bool,
         ],
         Float[Array, "batch_size state_dim"],
     ],
@@ -74,7 +71,7 @@ def evaluate_filter(
     measurement_time = 10 * burn_in_time
     total_steps = burn_in_time + measurement_time
 
-    initial_true_state = dynamical_system.initial_state
+    initial_true_state = dynamical_system.initial_state()
 
     keys = jax.random.split(key, num=(total_steps,))
 
@@ -83,7 +80,6 @@ def evaluate_filter(
         dynamical_system=dynamical_system,
         measurement_system=measurement_system,
         update=update,
-        debug=debug,
     )
 
     (final_carry, errors_over_time) = jax.lax.scan(

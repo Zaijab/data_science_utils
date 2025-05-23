@@ -1,6 +1,6 @@
 import equinox as eqx
 import abc
-from jaxtyping import Key, Float, Array, jaxtyped
+from jaxtyping import Key, Float, Array
 from data_science_utils.measurement_systems import AbstractMeasurementSystem
 
 
@@ -10,8 +10,8 @@ class AbstractFilter(eqx.Module, strict=True):
     def update(
         self,
         key: Key[Array, "..."],
-        ensemble: Float[Array, "batch_size state_dim"],
-        measurement: Float[Array, "batch_size measurement_dim"],
+        prior_ensemble: Float[Array, "batch_size state_dim"],
+        measurement: Float[Array, "measurement_dim"],
         measurement_system: AbstractMeasurementSystem,
     ) -> Float[Array, "batch_size state_dim"]:
-        pass
+        raise NotImplementedError

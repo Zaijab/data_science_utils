@@ -8,6 +8,7 @@ from data_science_utils.dynamical_systems import (
 )
 
 
+@jaxtyped(typechecker=typechecker)
 class Ikeda(AbstractInvertibleDiscreteDynamicalSystem, strict=True):
     u: float = 0.9
     batch_size: int = 10**3

@@ -16,6 +16,7 @@ from data_science_utils.dynamical_systems import AbstractContinuousDynamicalSyst
 from jaxtyping import Array, Float, Key, jaxtyped
 
 
+@jaxtyped(typechecker=typechecker)
 class Lorenz63(AbstractContinuousDynamicalSystem, strict=True):
     sigma: float = 10.0
     rho: float = 28.0
@@ -28,6 +29,7 @@ class Lorenz63(AbstractContinuousDynamicalSystem, strict=True):
     def dimension(self):
         return 3
 
+    @jaxtyped(typechecker=typechecker)
     @eqx.filter_jit
     def initial_state(
         self,
@@ -40,12 +42,13 @@ class Lorenz63(AbstractContinuousDynamicalSystem, strict=True):
             0
             if key is None
             else jax.random.multivariate_normal(
-                key, shape=(1,), mean=state, cov=jnp.eye(self.dimension)
+                key, mean=jnp.zeros(self.dimension), cov=jnp.eye(self.dimension)
             )
         )
 
         return state + noise
 
+    @jaxtyped(typechecker=typechecker)
     @eqx.filter_jit
     def vector_field(self, t, y, args):
         x, y, z = y

@@ -84,6 +84,7 @@ def lorenz96_generate(
     return final_states
 
 
+@jaxtyped(typechecker=typechecker)
 class Lorenz96(AbstractContinuousDynamicalSystem, strict=True):
     F: float = 8.0
     dt: float = 0.05
@@ -96,6 +97,7 @@ class Lorenz96(AbstractContinuousDynamicalSystem, strict=True):
     def dimension(self):
         return self.dim
 
+    @jaxtyped(typechecker=typechecker)
     @eqx.filter_jit
     def initial_state(
         self,
@@ -107,7 +109,7 @@ class Lorenz96(AbstractContinuousDynamicalSystem, strict=True):
             0
             if key is None
             else jax.random.multivariate_normal(
-                key, shape=(1,), mean=state, cov=jnp.eye(self.dimension)
+                key, mean=jnp.zeros(self.dimension), cov=jnp.eye(self.dimension)
             )
         )
 

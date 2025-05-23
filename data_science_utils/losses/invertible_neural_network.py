@@ -14,7 +14,7 @@ def kl_divergence(
 ) -> Float[Array, "1"]:
     z, log_det_jacobian = eqx.filter_vmap(model.inverse)(batch)
     base_log_prob = eqx.filter_vmap(logpdf_epanechnikov, in_axes=(0, None, None))(
-        z, jnp.zeros(2), jnp.eye(2)
+        z, jnp.zeros(batch.shape[-1]), jnp.eye(batch.shape[-1])
     )
     total_log_prob = base_log_prob + log_det_jacobian
     total_log_prob = jnp.where(jnp.isfinite(total_log_prob), total_log_prob, -1e6)

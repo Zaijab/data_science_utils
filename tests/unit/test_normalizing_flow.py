@@ -19,14 +19,14 @@ debug = False
 key = jax.random.key(0)
 
 # system = Ikeda(batch_size=25)
-system = Lorenz96()
-batch = system.generate(jax.random.key(0), batch_size=1000)
+system = Lorenz63()
+batch = system.generate(jax.random.key(0), batch_size=10)
 
 key, subkey = jax.random.split(key)
 
 model = InvertibleNN(
     input_dim=system.dimension,
-    hidden_dim=32,
+    hidden_dim=64,
     num_coupling_layers=6,
     num_hidden_layers=2,
     key=subkey,
@@ -34,39 +34,30 @@ model = InvertibleNN(
 
 
 optim = optax.chain(
+    optax.clip_by_global_norm(1.0),
     optax.adam(
-        learning_rate=1e-4,
-        eps=1e-4,
+        learning_rate=1e-5,
+        eps=1e-8,
     ),
 )
 opt_state = optim.init(eqx.filter(model, eqx.is_inexact_array))
-loss, model, opt_state = make_step(model, batch, optim, opt_state)
+batch = eqx.filter_vmap(system.flow)(0.0, 1.0, batch)
 
-x = jax.random.multivariate_normal(subkey, mean=jnp.zeros(2), cov=jnp.eye(2))
+from data_science_utils.losses import kl_divergence
 
+print("Doin a thing")
+kl_divergence(model, batch)
+print("Doin a thing")
 
-def plot_learning(model: InvertibleNN) -> None:
-    samples = sample_epanechnikov(
-        jax.random.key(0), jnp.zeros(2), jnp.eye(2), batch.shape[0]
-    )
-
-    generated_data = eqx.filter_vmap(model)(samples)[0]
-
-    plt.scatter(generated_data[:, 0], generated_data[:, 1], c="red", alpha=0.15)
-    plt.xlim(-1, 2)
-    plt.ylim(-3, 1.5)
-    plt.show()
+# loss, model, opt_state = make_step(model, batch, optim, opt_state)
 
 
-for i in range(10):
-    # print(
-    #     x,
-    #     model.inverse(model.forward(x)[0])[0],
-    #     jnp.allclose(x, model.inverse(model.forward(x)[0])[0]),
-    # )
-    batch = eqx.filter_vmap(system.flow)(0.0, 1.0, batch)
-    loss, model, opt_state = make_step(model, batch, optim, opt_state)
+# for i in range(10):
+#     print(i)
 
-    if (i % 500) == 0:
-        print(loss)
-        plot_learning(model)
+#     batch = eqx.filter_vmap(system.flow)(0.0, 1.0, batch)
+#     loss, model, opt_state = make_step(model, batch, optim, opt_state)
+
+#     if (i % 500) == 0:
+#         print(loss)
+#         # plot_learning(model)

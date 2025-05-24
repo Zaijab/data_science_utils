@@ -190,24 +190,27 @@ class CouplingLayer(eqx.Module):
     input_dim: int
     swap: bool
 
-    @jaxtyped(typechecker=typechecker)
-    def __init__(
-        self,
-        input_dim: int,
-        hidden_dim: int,
-        num_hidden_layers: int,
-        swap: bool,
-        *,
-        key: Key[Array, "..."],
-    ) -> None:
+    def __init__(self, input_dim, hidden_dim, num_hidden_layers, swap, *, key):
         s_key, t_key = jax.random.split(key)
 
         self.input_dim = input_dim
         self.swap = swap
 
+        # Calculate dimensions correctly for odd inputs
+        split_dim1 = input_dim // 2
+        split_dim2 = input_dim - split_dim1
+
+        # Determine conditioning and output dimensions based on swap
+        if swap:
+            condition_dim = split_dim2  # Larger part when odd
+            output_dim = split_dim1  # Smaller part when odd
+        else:
+            condition_dim = split_dim1  # Smaller part when odd
+            output_dim = split_dim2  # Larger part when odd
+
         self.s_net = eqx.nn.MLP(
-            in_size=input_dim // 2,
-            out_size=input_dim // 2,
+            in_size=condition_dim,
+            out_size=output_dim,
             width_size=hidden_dim,
             depth=num_hidden_layers,
             activation=jax.nn.gelu,
@@ -216,14 +219,30 @@ class CouplingLayer(eqx.Module):
         )
 
         self.t_net = eqx.nn.MLP(
-            in_size=input_dim // 2,
-            out_size=input_dim // 2,
+            in_size=condition_dim,
+            out_size=output_dim,
             width_size=hidden_dim,
             depth=num_hidden_layers,
             activation=jax.nn.gelu,
             key=t_key,
             dtype=jnp.float64,
         )
+
+    def _safe_split(self, x):
+        """Safely split input handling odd dimensions."""
+        input_dim = x.shape[-1]
+        split_point = input_dim // 2
+
+        if self.swap:
+            # For swap layers, take the larger part first when odd
+            split_point = input_dim - split_point
+            x1 = x[..., :split_point]
+            x2 = x[..., split_point:]
+            return x2, x1  # Return swapped
+        else:
+            x1 = x[..., :split_point]
+            x2 = x[..., split_point:]
+            return x1, x2
 
     @jaxtyped(typechecker=typechecker)
     def forward(
@@ -239,10 +258,10 @@ class CouplingLayer(eqx.Module):
             Tuple of (transformed tensor, log determinant of Jacobian)
         """
         if self.swap:
-            x1, x2 = jnp.split(x, 2, axis=-1)
+            x1, x2 = self._safe_split(x)
             x1, x2 = x2, x1
         else:
-            x1, x2 = jnp.split(x, 2, axis=-1)
+            x1, x2 = self._safe_split(x)
 
         s = self.s_net(x1)
         t = self.t_net(x1)
@@ -271,10 +290,10 @@ class CouplingLayer(eqx.Module):
             Tuple of (transformed tensor, log determinant of Jacobian)
         """
         if self.swap:
-            y1, y2 = jnp.split(y, 2, axis=-1)
+            y1, y2 = self._safe_split(y)
             y1, y2 = y2, y1
         else:
-            y1, y2 = jnp.split(y, 2, axis=-1)
+            y1, y2 = self._safe_split(y)
 
         s = self.s_net(y1)
         t = self.t_net(y1)

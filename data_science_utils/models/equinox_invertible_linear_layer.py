@@ -264,15 +264,13 @@ class CouplingLayer(eqx.Module):
             x1, x2 = self._safe_split(x)
 
         s = self.s_net(x1)
+        s = 10 * jnp.tanh(s / 10)
         t = self.t_net(x1)
 
         y2 = x2 * jnp.exp(s) + t
         log_det_jacobian = jnp.sum(s, axis=-1)
 
-        if self.swap:
-            y = jnp.concatenate([y2, x1], axis=-1)
-        else:
-            y = jnp.concatenate([x1, y2], axis=-1)
+        y = jnp.concatenate([x1, y2], axis=-1)
 
         return y, log_det_jacobian
 
@@ -296,15 +294,13 @@ class CouplingLayer(eqx.Module):
             y1, y2 = self._safe_split(y)
 
         s = self.s_net(y1)
+        s = 10 * jnp.tanh(s / 10)
         t = self.t_net(y1)
 
         x2 = (y2 - t) * jnp.exp(-s)
         log_det_jacobian = -jnp.sum(s, axis=-1)
 
-        if self.swap:
-            x = jnp.concatenate([x2, y1], axis=-1)
-        else:
-            x = jnp.concatenate([y1, x2], axis=-1)
+        x = jnp.concatenate([y1, x2], axis=-1)
 
         return x, log_det_jacobian
 

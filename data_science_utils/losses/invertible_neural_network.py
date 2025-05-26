@@ -24,7 +24,7 @@ def kl_divergence(
 @eqx.filter_jit
 def make_step(
     model: Callable, x, optim, opt_state
-) -> tuple[Float[Array, "..."], Float[Array, "..."], Float[Array, "..."]]:
+) -> tuple[Float[Array, "..."], eqx.Module, Float[Array, "..."]]:
     loss, grad = kl_divergence(model, x)
     updates, opt_state = optim.update(grad, opt_state)
     model = eqx.apply_updates(model, updates)

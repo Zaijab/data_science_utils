@@ -14,3 +14,12 @@ def test_measurement() -> None:
     for measurement_system_class in measurement_system_classes:
         measurement_system = measurement_system_class(jnp.array([[1 / 16]]))
         measurement_system(jnp.array([1.25, 0]))
+
+
+def test_likelihood() -> None:
+    measurement_system_classes = [RangeSensor]
+    for measurement_system_class in measurement_system_classes:
+        measurement_system = measurement_system_class(jnp.array([[1 / 16]]))
+        likelihood = measurement_system.likelihood(
+            jnp.array([1.25, 0]), jnp.array([1.25])
+        )

@@ -17,3 +17,7 @@ from data_science_utils.dynamical_systems.lorenz63 import (
 from data_science_utils.dynamical_systems.lorenz96 import (
     Lorenz96 as Lorenz96,
 )
+
+from data_science_utils.dynamical_systems.vicsek import (
+    Vicsek as Vicsek,
+)

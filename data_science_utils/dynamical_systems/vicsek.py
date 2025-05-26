@@ -4,7 +4,9 @@ import jax.numpy as jnp
 from beartype import beartype as typechecker
 from jaxtyping import Array, Float, jaxtyped
 
-from data_science_utils.dynamical_systems import AbstractDiscreteDynamicalSystem
+from data_science_utils.dynamical_systems.abc import (
+    AbstractStochasticDiscreteDynamicalSystem,
+)
 
 import jax
 import jax.numpy as jnp
@@ -40,7 +42,8 @@ def points_in_epsilon_ball(point_cloud, query_points, radius):
 
     # Create mask for points within radius
     mask = squared_distances <= radius**2  # (n_queries, n_points)
-
+    # mask[i, j]
+    # True if query_point[i] < point_cloud[j]
     return mask
 
 
@@ -53,7 +56,7 @@ from functools import partial
 
 
 @jaxtyped(typechecker=typechecker)
-class VicsekModel(AbstractDiscreteDynamicalSystem):
+class Vicsek(AbstractStochasticDiscreteDynamicalSystem):
     """
     2D Vicsek Model for collective motion.
 
@@ -64,62 +67,39 @@ class VicsekModel(AbstractDiscreteDynamicalSystem):
     """
 
     # Model parameters
-    n_particles: int
-    speed: float
-    noise_strength: float
-    interaction_radius: float
-    domain_size: Float[Array, "2"]
+    # Number of particles in the system
+    n_particles: int = 100
 
-    def __init__(
-        self,
-        n_particles: int,
-        speed: float = 0.03,
-        noise_strength: float = 0.1,
-        interaction_radius: float = 1.0,
-        domain_size: Float[Array, "2"] = None,
-    ):
-        """
-        Initialize the Vicsek model.
+    # Constant speed of all particles
+    speed: float = 0.03
 
-        Args:
-            n_particles: Number of particles in the system
-            speed: Constant speed of all particles
-            noise_strength: Magnitude of angular noise (in radians)
-            interaction_radius: Radius within which particles interact
-            domain_size: Size of the periodic domain [width, height]
-        """
-        self.n_particles = n_particles
-        self.speed = speed
-        self.noise_strength = noise_strength
-        self.interaction_radius = interaction_radius
+    # Magnitude of angular noise (in radians)
+    noise_strength: float = 0.1
 
-        # Default domain size is a 10x10 square if not specified
-        if domain_size is None:
-            self.domain_size = jnp.array([10.0, 10.0])
-        else:
-            self.domain_size = domain_size
+    # Radius within which particles interact
+    interaction_radius: float = 1.0
+
+    # Size of the periodic domain [width, height]
+    domain_width: float = 10.0
+    domain_height: float = 10.0
+
+    @property
+    def dimension(self):
+        return 2
 
     @jaxtyped(typechecker=typechecker)
-    def initialize_state(self, key: Key[Array, ""]) -> Float[Array, "n_particles 3"]:
-        """
-        Initialize random positions and orientations.
+    @eqx.filter_jit
+    def initial_state(
+        self, key: Key[Array, "..."] | None = None, **kwargs
+    ) -> Float[Array, "n_particles 3"]:
 
-        Args:
-            key: PRNG key for random generation
-
-        Returns:
-            state: Initial state with random positions and orientations
-        """
         # Split key for positions and orientations
         pos_key, ori_key = jax.random.split(key)
 
         # Random positions uniformly distributed in the domain
-        positions = (
-            jax.random.uniform(
-                pos_key, shape=(self.n_particles, 2), minval=0.0, maxval=1.0
-            )
-            * self.domain_size
-        )
+        positions = jax.random.uniform(
+            pos_key, shape=(self.n_particles, 2), minval=0.0, maxval=1.0
+        ) * jnp.array([self.domain_width, self.domain_height])
 
         # Random orientations in [0, 2π)
         orientations = jax.random.uniform(
@@ -136,8 +116,8 @@ class VicsekModel(AbstractDiscreteDynamicalSystem):
     @jaxtyped(typechecker=typechecker)
     @eqx.filter_jit
     def forward(
-        self, state: Float[Array, "n_particles 3"], key: Key[Array, ""]
-    ) -> Float[Array, "n_particles 3"]:
+        self, state: Float[Array, "{self.n_particles} 3"], key: Key[Array, "..."]
+    ) -> Float[Array, "{self.n_particles} 3"]:
         """
         Perform one step of the Vicsek model:
         1. Find neighbors within interaction radius
@@ -221,7 +201,9 @@ class VicsekModel(AbstractDiscreteDynamicalSystem):
         new_positions = positions + jnp.column_stack((velocity_x, velocity_y))
 
         # Apply periodic boundary conditions
-        new_positions = jnp.mod(new_positions, self.domain_size)
+        new_positions = jnp.mod(
+            new_positions, jnp.array([self.domain_width, self.domain_height])
+        )
 
         # Construct new state
         new_state = jnp.zeros_like(state)
@@ -229,234 +211,3 @@ class VicsekModel(AbstractDiscreteDynamicalSystem):
         new_state = new_state.at[:, 2].set(new_orientation)
 
         return new_state
-
-
-system = VicsekModel(n_particles=200)
-
-key = jax.random.key(0)
-key, subkey = jax.random.split(key)
-true_state = system.initialize_state(subkey)
-
-key, subkey = jax.random.split(key)
-system.forward(true_state, subkey)
-system.forward(true_state, subkey)
-
-import datetime
-
-print(datetime.datetime.now())
-system.forward(true_state, subkey)
-
-
-def run_simulation(model, initial_state, n_steps, seed=0):
-    """
-    Run the Vicsek model for n_steps and return the trajectory.
-    """
-    # Initialize trajectory array to store all states
-    states = jnp.zeros((n_steps + 1, model.n_particles, 3))
-    states = states.at[0].set(initial_state)
-
-    # Create initial key
-    key = jax.random.key(seed)
-
-    # Run simulation
-    for i in range(n_steps):
-        key, step_key = jax.random.split(key)
-        states = states.at[i + 1].set(model.forward(states[i], step_key))
-
-    return states
-
-
-def create_animation(states, model, figsize=(10, 10), interval=50, show_velocity=True):
-    """
-    Create animation of Vicsek model simulation.
-    """
-    n_steps = states.shape[0]
-
-    # Convert to numpy for matplotlib
-    states_np = np.array(states)
-
-    # Create figure and axis
-    fig, ax = plt.subplots(figsize=figsize)
-
-    # Set axis limits with some padding
-    padding = 0.5
-    ax.set_xlim(-padding, model.domain_size[0] + padding)
-    ax.set_ylim(-padding, model.domain_size[1] + padding)
-
-    # Plot domain boundary
-    ax.add_patch(
-        plt.Rectangle(
-            (0, 0),
-            model.domain_size[0],
-            model.domain_size[1],
-            fill=False,
-            edgecolor="gray",
-            linestyle="--",
-        )
-    )
-
-    # Initialize scatter plot for particles
-    particles = ax.scatter([], [], s=25, color="blue", alpha=0.7)
-    # Get initial positions and orientations
-    initial_positions = states_np[0, :, 0:2]
-    initial_orientations = states_np[0, :, 2]
-    initial_vel_x = np.cos(initial_orientations)
-    initial_vel_y = np.sin(initial_orientations)
-
-    # Initialize quiver plot with initial data
-    velocities = ax.quiver(
-        initial_positions[:, 0],
-        initial_positions[:, 1],
-        initial_vel_x,
-        initial_vel_y,
-        scale=15,
-        width=0.005,
-    )
-
-    # # Initialize quiver plot for velocities if requested
-    # if show_velocity:
-    #     velocities = ax.quiver([], [], [], [], scale=15, width=0.005)
-
-    # Add time text
-    time_text = ax.text(0.02, 0.98, "", transform=ax.transAxes, verticalalignment="top")
-
-    # Add title and labels
-    ax.set_title(
-        f"Vicsek Model (N={model.n_particles}, R={model.interaction_radius}, η={model.noise_strength})"
-    )
-    ax.set_xlabel("X")
-    ax.set_ylabel("Y")
-
-    # Animation update function
-    def update(frame):
-        # Extract positions and orientations
-        positions = states_np[frame, :, 0:2]
-        orientations = states_np[frame, :, 2]
-
-        # Update particles
-        particles.set_offsets(positions)
-
-        # Update velocities if requested
-        if show_velocity:
-            vel_x = np.cos(orientations)
-            vel_y = np.sin(orientations)
-            velocities.set_offsets(positions)
-            velocities.set_UVC(vel_x, vel_y)
-
-        # Update time text
-        time_text.set_text(f"Step: {frame}")
-
-        if show_velocity:
-            return particles, velocities, time_text
-        else:
-            return particles, time_text
-
-    # Create animation
-    anim = animation.FuncAnimation(
-        fig, update, frames=n_steps, interval=interval, blit=True
-    )
-
-    plt.close(fig)  # To avoid displaying the figure twice
-
-    return anim, fig
-
-
-# Run the simulation and create animation
-def simulate_vicsek_model(
-    n_particles=200,
-    speed=0.05,
-    noise=0.2,
-    radius=0.5,
-    n_steps=100,
-    domain_size=None,
-    seed=0,
-    save_gif=True,
-):
-    """
-    Run a full Vicsek model simulation and return the animation.
-
-    Parameters:
-    -----------
-    n_particles : int
-        Number of particles
-    speed : float
-        Particle speed
-    noise : float
-        Noise strength (in radians)
-    radius : float
-        Interaction radius
-    n_steps : int
-        Number of simulation steps
-    domain_size : array-like, optional
-        Size of the domain [width, height]
-    seed : int
-        Random seed
-    save_gif : bool
-        Whether to save the animation as a GIF
-
-    Returns:
-    --------
-    animation object
-    """
-    # Create model
-    if domain_size is None:
-        domain_size = jnp.array([10.0, 10.0])
-
-    model = VicsekModel(
-        n_particles=n_particles,
-        speed=speed,
-        noise_strength=noise,
-        interaction_radius=radius,
-        domain_size=domain_size,
-    )
-
-    # Initialize state
-    key = jax.random.key(seed)
-    initial_state = model.initialize_state(key)
-
-    # Run simulation
-    states = run_simulation(model, initial_state, n_steps)
-
-    # Create animation
-    anim, fig = create_animation(states, model, interval=100)
-
-    # Save GIF if requested
-    if save_gif:
-        try:
-            anim.save("vicsek_model.gif", writer="pillow", fps=10)
-            print("Animation saved as 'vicsek_model.gif'")
-        except Exception as e:
-            print(f"Failed to save GIF: {e}")
-
-    return anim, fig, states
-
-
-# Example usage
-anim, fig, states = simulate_vicsek_model(
-    n_particles=200, speed=0.05, noise=0.2, radius=0.5, n_steps=100, save_gif=True
-)
-
-
-@jaxtyped(typechecker=typechecker)
-class VicsekModel(eqx.Module):
-    n_particles: int = 100
-
-    def __init__(
-        self, key, n_particles, box_size, velocity, radius, noise_strength, dt
-    ):
-        # Split the key for position and orientation
-        key_pos, key_theta = jax.random.split(key)
-
-        # Randomly distribute particles in the box
-        positions = jax.random.uniform(key_pos, shape=(n_particles, 2)) * box_size
-
-        # Random initial directions (angles in radians)
-        thetas = jax.random.uniform(key_theta, shape=(n_particles,)) * 2 * jnp.pi
-
-        return positions, thetas
-
-    pass
-
-
-def animate_vicsek():
-    pass

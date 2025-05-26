@@ -69,7 +69,7 @@ class PLULinear(eqx.Module):
     def _construct_U(self) -> jax.Array:
         """Construct upper triangular matrix U."""
         # Apply softplus to ensure diagonal elements are positive
-        u_diag = jax.nn.softplus(self.U_diag) + 1e-5
+        u_diag = jax.nn.softplus(self.U_diag)  # + 1e-5
 
         # Create diagonal matrix
         U = jnp.diag(u_diag)
@@ -96,7 +96,7 @@ class PLULinear(eqx.Module):
         # log_det_L = 0.0
 
         # Log det of U is sum of log of diagonal elements
-        u_diag = jax.nn.softplus(self.U_diag) + 1e-5
+        u_diag = jax.nn.softplus(self.U_diag)  # + 1e-5
         log_det_U = jnp.sum(jnp.log(u_diag))
 
         # Total log det: P contributes sign only
@@ -264,7 +264,7 @@ class CouplingLayer(eqx.Module):
             x1, x2 = self._safe_split(x)
 
         s = self.s_net(x1)
-        s = 10 * jnp.tanh(s / 10)
+        s = 15 * jnp.tanh(s)
         t = self.t_net(x1)
 
         y2 = x2 * jnp.exp(s) + t
@@ -294,7 +294,7 @@ class CouplingLayer(eqx.Module):
             y1, y2 = self._safe_split(y)
 
         s = self.s_net(y1)
-        s = 10 * jnp.tanh(s / 10)
+        s = 15 * jnp.tanh(s)
         t = self.t_net(y1)
 
         x2 = (y2 - t) * jnp.exp(-s)

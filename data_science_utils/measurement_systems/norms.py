@@ -24,6 +24,22 @@ class RangeSensor(AbstractMeasurementSystem):
 
     @jaxtyped(typechecker=typechecker)
     @eqx.filter_jit
+    def likelihood(
+        self,
+        state: Float[Array, "state_dim"],
+        measurement: Float[Array, "measurement_dim"],
+        **kwargs,
+    ) -> Float[Array, ""]:
+        """
+        Returns the likelihood of a point given a measurement.
+        """
+
+        return jax.scipy.stats.multivariate_normal.pdf(
+            self(state), mean=measurement, cov=self.covariance
+        )
+
+    @jaxtyped(typechecker=typechecker)
+    @eqx.filter_jit
     def __call__(
         self, state: Float[Array, "state_dim"], key: Key[Array, ""] | None = None
     ) -> Float[Array, "1"]:

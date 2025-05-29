@@ -6,3 +6,8 @@ from data_science_utils.statistics.epanechnikov import (
     pdf_epanechnikov as pdf_epanechnikov,
     sample_epanechnikov as sample_epanechnikov,
 )
+
+from data_science_utils.statistics.gaussian_mixture_model import (
+    GMM as GMM,
+    #    MaskedGMM as MaskedGMM,
+)

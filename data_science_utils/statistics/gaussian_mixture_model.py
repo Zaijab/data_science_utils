@@ -37,7 +37,7 @@ from typing import List
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, Float, Key, jaxtyped
+from jaxtyping import Array, Float, Key, jaxtyped, PyTree
 from beartype import beartype as typechecker
 from typing import List
 
@@ -49,11 +49,22 @@ class GMM(eqx.Module):
     weights: Float[Array, "num_components"]
 
     @jaxtyped(typechecker=typechecker)
+    def __init__(self, means, covs, weights, max_components=1):
+        max_components = max(means.shape[0], max_components)
+        pad_width = max_components - means.shape[0]
+        self.means = jnp.pad(means, ((0, pad_width), (0, 0)))
+        self.covs = jnp.pad(covs, ((0, pad_width), (0, 0), (0, 0)))
+        self.weights = jnp.pad(weights, (0, pad_width))
+
+    @jaxtyped(typechecker=typechecker)
     @eqx.filter_jit
     def sample(self, key: Key[Array, ""]) -> Float[Array, "state_dim"]:
+        sampling_weights = self.weights / jnp.sum(self.weights)
         gaussian_index_key, gaussian_state_key = jax.random.split(key)
         gaussian_index = jax.random.choice(
-            key=gaussian_index_key, a=jnp.arange(self.weights.shape[0]), p=self.weights
+            key=gaussian_index_key,
+            a=jnp.arange(self.weights.shape[0]),
+            p=sampling_weights,
         )
         sample = jax.random.multivariate_normal(
             gaussian_state_key,
@@ -64,177 +75,39 @@ class GMM(eqx.Module):
 
 
 @jaxtyped(typechecker=typechecker)
-class MultiGMM(eqx.Module):
-    """Vectorized multiple GMMs with zero-padding for uniform shapes."""
+@eqx.filter_jit
+def merge_gmms(
+    gmm1: GMM, gmm2: GMM, key: Key[Array, ""], target_components: int = 250
+) -> GMM:
+    target_components = min(
+        target_components, gmm1.weights.shape[0] + gmm2.weights.shape[0]
+    )
+    # Compute total weights
+    W1 = jnp.sum(gmm1.weights)
+    W2 = jnp.sum(gmm2.weights)
+    Z = W1 + W2
 
-    means: Float[Array, "num_gmm max_components state_dim"]
-    covs: Float[Array, "num_gmm max_components state_dim state_dim"]
-    weights: Float[Array, "num_gmm max_components"]
+    # Sample target_components points using Algorithm 2 logic
+    uniform_keys = jax.random.split(key, target_components)
 
-    def __init__(self, gmms: List[GMM]):
-        assert len(gmms) > 0, "Need at least one GMM"
-
-        state_dim = gmms[0].means.shape[1]
-        max_components = max(gmm.means.shape[0] for gmm in gmms)
-
-        # Pad each GMM to max_components and collect in single pass
-        def pad_gmm(gmm: GMM) -> GMM:
-            pad_width = max_components - gmm.means.shape[0]
-
-            padded_means = jnp.pad(gmm.means, ((0, pad_width), (0, 0)), mode="constant")
-            padded_weights = jnp.pad(gmm.weights, (0, pad_width), mode="constant")
-
-            identity_padding = jnp.tile(jnp.eye(state_dim), (pad_width, 1, 1))
-            padded_covs = jnp.concatenate([gmm.covs, identity_padding], axis=0)
-
-            return GMM(padded_means, padded_covs, padded_weights)
-
-        # Pad all GMMs and use tree operations to stack
-        padded_gmms = [pad_gmm(gmm) for gmm in gmms]
-        stacked = jax.tree_map(lambda *arrays: jnp.stack(arrays), *padded_gmms)
-
-        # Verify shapes are correct for JIT compilation
-        assert stacked.means.shape == (len(gmms), max_components, state_dim)
-        assert stacked.covs.shape == (len(gmms), max_components, state_dim, state_dim)
-        assert stacked.weights.shape == (len(gmms), max_components)
-
-        self.means = stacked.means
-        self.covs = stacked.covs
-        self.weights = stacked.weights
-
-    @jaxtyped(typechecker=typechecker)
-    @eqx.filter_jit
-    def sample(
-        self, key: Key[Array, ""], gmm_idx: int | Int[Array, "..."]
-    ) -> Float[Array, "state_dim"]:
-        """Sample from the gmm_idx-th GMM."""
-        gaussian_index_key, gaussian_state_key = jax.random.split(key)
-
-        # Weights are already zero-padded, just renormalize
-        weights = self.weights[gmm_idx]
-        # weights = weights / jnp.sum(weights)
-
-        gaussian_index = jax.random.choice(
-            key=gaussian_index_key, a=jnp.arange(self.weights.shape[1]), p=weights
+    def sample_one(key_i):
+        u = jax.random.uniform(key_i)
+        return jax.lax.cond(
+            u < W1 / Z, lambda: gmm1.sample(key_i), lambda: gmm2.sample(key_i)
         )
 
-        sample = jax.random.multivariate_normal(
-            gaussian_state_key,
-            mean=self.means[gmm_idx, gaussian_index],
-            cov=self.covs[gmm_idx, gaussian_index],
-        )
-        return sample
+    samples = jax.vmap(sample_one)(uniform_keys)
 
-    @jaxtyped(typechecker=typechecker)
-    @eqx.filter_jit
-    def sample_all(self, key: Key[Array, ""]) -> Float[Array, "num_gmm state_dim"]:
-        """Sample one point from each GMM."""
-        keys = jax.random.split(key, self.means.shape[0])
-        samples = eqx.filter_vmap(lambda k, i: self.sample(k, i))(
-            keys, jnp.arange(self.means.shape[0])
-        )
-        return samples
-
-
-@jaxtyped(typechecker=typechecker)
-class LMBBirthModel(eqx.Module):
-    """Labeled Multi-Bernoulli birth model from Section II.B of the paper."""
-
-    birth_probs: Float[Array, "num_birth_locations"]  # r_B(ℓ)
-    birth_gmms: MultiGMM  # p_B(·, ℓ) for each birth location
-
-    def __init__(
-        self, birth_probs: Float[Array, "num_birth_locations"], gmms: List[GMM]
-    ):
-        assert birth_probs.shape[0] == len(gmms), "Mismatch in birth locations"
-        assert jnp.all(birth_probs >= 0) and jnp.all(
-            birth_probs <= 1
-        ), "Invalid probabilities"
-
-        self.birth_probs = birth_probs
-        self.birth_gmms = MultiGMM(gmms)
-
-    @jaxtyped(typechecker=typechecker)
-    @eqx.filter_jit
-    def sample_birth_indicators(
-        self, key: Key[Array, ""]
-    ) -> Float[Array, "num_birth_locations"]:
-        """Sample Bernoulli indicators for each birth location."""
-        keys = jax.random.split(key, self.birth_probs.shape[0])
-        indicators = eqx.filter_vmap(
-            lambda k, p: jax.random.bernoulli(k, p).astype(jnp.float32)
-        )(keys, self.birth_probs)
-        return indicators
-
-    @jaxtyped(typechecker=typechecker)
-    @eqx.filter_jit
-    def sample_birth_states(
-        self, key: Key[Array, ""]
-    ) -> Float[Array, "num_birth_locations state_dim"]:
-        """Sample birth states from each GMM (regardless of birth indicators)."""
-        return self.birth_gmms.sample_all(key)
-
-    @jaxtyped(typechecker=typechecker)
-    @eqx.filter_jit
-    def sample_births(
-        self, key: Key[Array, ""]
-    ) -> tuple[Float[Array, "num_births state_dim"], Float[Array, "num_births"]]:
-        """
-        Complete birth sampling: indicators + states for born objects.
-
-        Returns:
-            born_states: States of actually born objects
-            born_labels: Labels (indices) of born objects
-        """
-        indicator_key, state_key = jax.random.split(key)
-
-        # Sample birth indicators and states
-        indicators = self.sample_birth_indicators(indicator_key)
-        all_states = self.sample_birth_states(state_key)
-
-        # Extract only born objects
-        born_mask = indicators.astype(bool)
-        born_states = all_states[born_mask]
-        born_labels = jnp.where(born_mask)[0].astype(jnp.float32)
-
-        return born_states, born_labels
-
-
-# Test implementation
-if __name__ == "__main__":
-    key = jax.random.key(42)
-
-    # Create test GMMs with different numbers of components
-    gmm_1 = GMM(
-        jnp.array([[0.0, 0.0], [5.0, 3.0], [2.0, 1.0]]),
-        jnp.array([jnp.eye(2), 2 * jnp.eye(2), 0.5 * jnp.eye(2)]),
-        jnp.array([0.3, 0.5, 0.2]),
+    # Reconstruct GMM with uniform weights
+    uniform_weights = jnp.full(
+        target_components, jnp.array([W1 + W2]) / target_components
     )
+    spatial_dimension = gmm_1.means.shape[1]
+    silverman_beta = (
+        ((4) / (spatial_dimension + 2)) ** (2 / (spatial_dimension + 4))
+    ) * ((target_components) ** (-(2) / (spatial_dimension + 4)))
+    covariance = (silverman_beta / Z) * jnp.cov(samples.T)
 
-    gmm_2 = GMM(
-        jnp.array([[10.0, 10.0], [15.0, 13.0]]),
-        jnp.array([3 * jnp.eye(2), jnp.eye(2)]),
-        jnp.array([0.6, 0.4]),
+    return GMM(
+        samples, jnp.tile(covariance, (target_components, 1, 1)), uniform_weights
     )
-
-    gmm_3 = GMM(
-        jnp.array([[20.0, 20.0]]), jnp.array([4 * jnp.eye(2)]), jnp.array([1.0])
-    )
-
-    gmms = MultiGMM([gmm_1, gmm_2, gmm_3])
-    print(gmms)
-    key, subkey = jax.random.split(key)
-    print(gmms.sample(key, jnp.asarray(0)))
-    print(gmms.sample_all(key))
-
-    # Create LMB birth model
-    # birth_probs = jnp.array([0.1, 0.05, 0.08])
-    # lmb_birth = LMBBirthModel(birth_probs, [gmm_1, gmm_2, gmm_3])
-
-    # Test sampling
-    # key, subkey = jax.random.split(key)
-    # born_states, born_labels = lmb_birth.sample_births(subkey)
-
-    # print(f"Born states shape: {born_states.shape}")
-    # print(f"Born labels: {born_labels}")
-    # print(f"Number of births: {len(born_labels)}")

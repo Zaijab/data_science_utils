@@ -1,0 +1,4 @@
+This module describes dynamical systems for use in filtering applications.
+There are two kinds of dynamical systems described thus far, discrete update equations and random finite set dynamical systems.
+
+RFS dynamical systems are systems which include birth and death processes for the individual points. 

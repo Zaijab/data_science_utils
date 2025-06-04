@@ -1,3 +1,20 @@
+"""
+This module describes dynamical systems for the express purpose of evaluating stochastic filtering algorithms.
+The ABC structure allows the user to define their choice of dynamical system to reduce code duplication.
+
+# TODO: Create Stochastic Systems
+#     - This introduces noise (of our choice) to the forward equations
+#     - This changes the type signatures for the forward (hence, trajectory, orbit, flow) functions
+
+TODO: Create Multi-Object Systems
+    - This has a forward map of shape state: Float[Array, "num_objects state_dim"]
+    - For standard dynamical systems, this is easy to vmap
+    - This type is necessary for swarm models like Vicsek
+
+TODO: Create RFS Systems
+    - This entails a maximum size + active mask: Bool[Array, "max_size"]
+"""
+
 import jax
 import jax.numpy as jnp
 import equinox as eqx
@@ -14,7 +31,9 @@ from diffrax import (
 
 
 class AbstractDynamicalSystem(eqx.Module, strict=True):
-    """Abstract base class for dynamical systems in stochastic filtering."""
+    """
+    Abstract base class for dynamical systems in stochastic filtering.
+    """
 
     @property
     @abc.abstractmethod
@@ -96,6 +115,7 @@ class AbstractDynamicalSystem(eqx.Module, strict=True):
 
 
 class AbstractContinuousDynamicalSystem(AbstractDynamicalSystem, strict=True):
+    """ """
 
     @abc.abstractmethod
     def vector_field():
@@ -146,14 +166,21 @@ class AbstractDiscreteDynamicalSystem(AbstractDynamicalSystem, strict=True):
         """
         assert initial_time <= final_time, "This is a discrete system without inverse."
 
-        safe_initial_time = (
-            jnp.atleast_1d(initial_time) if saveat.subs.t0 else jnp.array([])
-        )
-        safe_final_time = (
-            jnp.atleast_1d(final_time) if saveat.subs.t1 else jnp.array([])
-        )
-        safe_array = jnp.array([]) if saveat.subs.ts is None else saveat.subs.ts
-        xs = jnp.concatenate([safe_initial_time, safe_array, safe_final_time])
+        if saveat.subs.steps:
+            safe_initial_time = (
+                jnp.atleast_1d(initial_time) if saveat.subs.t0 else jnp.array([])
+            )
+            safe_dense = jnp.arange(initial_time, final_time) + 1
+            xs = jnp.concatenate([safe_initial_time, safe_dense])
+        else:
+            safe_initial_time = (
+                jnp.atleast_1d(initial_time) if saveat.subs.t0 else jnp.array([])
+            )
+            safe_final_time = (
+                jnp.atleast_1d(final_time) if saveat.subs.t1 else jnp.array([])
+            )
+            safe_array = jnp.array([]) if saveat.subs.ts is None else saveat.subs.ts
+            xs = jnp.concatenate([safe_initial_time, safe_array, safe_final_time])
 
         def body_fn(carry, x):
             """
@@ -289,6 +316,20 @@ class AbstractStochasticDynamicalSystem(eqx.Module, strict=True):
             saveat=SaveAt(t1=True),
         )
         return states[-1]
+
+    def orbit(
+        self,
+        key: Key[Array, "..."],
+        initial_time: float,
+        final_time: float,
+        state: Float[Array, "state_dim"],
+        saveat: SaveAt,
+    ) -> Float[Array, "state_dim"]:
+        """
+        Trajectory but just return ys.
+        """
+        _, states = self.trajectory(key, initial_time, final_time, state, saveat)
+        return states
 
     @jaxtyped(typechecker=typechecker)
     @eqx.filter_jit

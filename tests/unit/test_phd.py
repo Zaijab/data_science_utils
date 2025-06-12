@@ -139,6 +139,40 @@ def sample_from_multiple_gmms(
     return GMM(samples, jnp.tile(cov, (target_components, 1, 1)), uniform_weights)
 
 
+@jaxtyped(typechecker=typechecker)
+@eqx.filter_jit
+def sample_from_large_gmm(
+    means: Float[Array, "num_components state_dim"],
+    weights: Float[Array, "num_components"],
+    covs: Float[Array, "num_components state_dim state_dim"],
+    key: Key[Array, ""],
+    target_components: int = 250,
+) -> GMM:
+    # Normalize weights
+    probs = weights / jnp.sum(weights)
+
+    # Sample component indices
+    keys = jax.random.split(key, target_components)
+    indices = jax.vmap(lambda k: jax.random.choice(k, means.shape[0], p=probs))(keys)
+
+    # Sample from selected components
+    samples = jax.vmap(
+        lambda k, i: jax.random.multivariate_normal(k, means[i], covs[i])
+    )(keys, indices)
+
+    # Apply KDE
+    beta = ((4 / (means.shape[-1] + 2)) ** (2 / (means.shape[-1] + 4))) * (
+        target_components ** (-2 / (means.shape[-1] + 4))
+    )
+    kde_cov = beta * jnp.cov(samples.T)
+
+    return GMM(
+        samples,
+        jnp.tile(kde_cov, (target_components, 1, 1)),
+        jnp.full(target_components, jnp.sum(weights) / target_components),
+    )
+
+
 @jax.jit
 @jax.vmap
 def sample_gaussian_mixture(key, point, cov):
@@ -246,7 +280,6 @@ class EnGMPHD(eqx.Module, strict=True):
         prior_ensemble = prior_gmm.means
         prior_covs = prior_gmm.covs
         prior_weights = prior_gmm.weights
-        prior_weights = (1 - detection_probability) * prior_weights
 
         key, subkey, *subkeys = jax.random.split(key, 2 + prior_ensemble.shape[0])
         subkeys = jnp.array(subkeys)
@@ -257,9 +290,8 @@ class EnGMPHD(eqx.Module, strict=True):
         bandwidth = (
             (4) / (prior_ensemble.shape[0] * (prior_ensemble.shape[-1] + 2))
         ) ** ((2) / (prior_ensemble.shape[-1] + 4))
-        emperical_covariance = jnp.cov(prior_ensemble.T)  # + 1e-8 * jnp.eye(2)
+        emperical_covariance = jnp.cov(prior_ensemble.T)
 
-        # Gaussian localization with radius L
         state_dim = emperical_covariance.shape[0]
         i_indices = jnp.arange(state_dim)[:, None]
         j_indices = jnp.arange(state_dim)[None, :]
@@ -290,7 +322,7 @@ class EnGMPHD(eqx.Module, strict=True):
                 ),
                 lambda: (
                     jnp.zeros_like(prior_gmm.means),
-                    jnp.full((prior_gmm.weights.shape[0]), -jnp.inf),
+                    jnp.full((prior_gmm.weights.shape[0]), jnp.asarray(0.0)),
                     jnp.zeros_like(prior_gmm.covs),
                 ),
             )
@@ -299,19 +331,77 @@ class EnGMPHD(eqx.Module, strict=True):
             process_measurement
         )(measurements, measurements_mask)
 
+        print(posterior_ensemble)
+
         logposterior_weights = logposterior_weights[:, :]
+        print(logposterior_weights)
+
+        # PHD update formula: log(P_D * w_prior * likelihood)
+        log_detection_terms = (
+            jnp.log(detection_probability)
+            + jnp.log(prior_weights)[None, :]
+            + logposterior_weights
+        )
+
+        # Denominator: log(clutter + sum(detection_terms)) per measurement
+        log_sum_detection = jax.scipy.special.logsumexp(
+            log_detection_terms, axis=1, keepdims=True
+        )
+        log_denominators = jnp.log(clutter_density + jnp.exp(log_sum_detection))
+
+        # Final normalized weights
+        normalized_weights = jnp.where(
+            measurements_mask[:, None],
+            jnp.exp(log_detection_terms - log_denominators),
+            0.0,
+        )
+        print(normalized_weights)
+
         # Scale Weights
-        m = jnp.max(logposterior_weights)
-        g = m + jnp.log(jnp.sum(jnp.exp(logposterior_weights - m)))
-        posterior_weights = jnp.exp(logposterior_weights - g)
-        posterior_weights = posterior_weights / jnp.sum(posterior_weights)
+        # m = jnp.max(logposterior_weights)
+        # g = m + jnp.log(jnp.sum(jnp.exp(logposterior_weights - m)))
+        # posterior_weights = jnp.exp(logposterior_weights - g)
+        # log_normalizer = jax.scipy.special.logsumexp(
+        #     logposterior_weights, axis=1, keepdims=True
+        # )
+        # posterior_weights = jnp.exp(logposterior_weights - log_normalizer)
+        # posterior_weights = jnp.exp(logposterior_weights)
+
+        # detection_weights = (
+        #     detection_probability * prior_weights[None, :] * posterior_weights
+        # )
+        # denominators = clutter_density + jnp.sum(
+        #     detection_weights, axis=1, keepdims=True
+        # )
+        # normalized_weights = jnp.where(
+        #     measurements_mask[:, None], detection_weights / denominators, 0.0
+        # )
 
         key, subkey = jax.random.split(key)
-        posterior_gmm = sample_from_multiple_gmms(
-            posterior_ensemble,
-            posterior_weights,
-            posterior_covariances,
-            measurements_mask,
+
+        # Missed detection
+        missed_weights = (1 - detection_probability) * prior_weights
+        missed_means = prior_gmm.means
+        missed_covs = prior_gmm.covs
+
+        # Detection (flatten your computed arrays)
+        flat_detection_weights = normalized_weights.reshape(-1)
+        flat_detection_means = posterior_ensemble.reshape(
+            -1, posterior_ensemble.shape[-1]
+        )
+        flat_detection_covs = posterior_covariances.reshape(
+            -1, *posterior_covariances.shape[-2:]
+        )
+
+        # Concatenate
+        final_weights = jnp.concatenate([missed_weights, flat_detection_weights])
+        final_means = jnp.concatenate([missed_means, flat_detection_means])
+        final_covs = jnp.concatenate([missed_covs, flat_detection_covs])
+
+        posterior_gmm = sample_from_large_gmm(
+            final_means,
+            final_weights,
+            final_covs,
             subkey,
             250,
         )
@@ -517,8 +607,9 @@ for _ in range(50):
         6.25e-8,
         0.98,
     )
+    print(jnp.sort(intensity_function.weights)[:20])
 
-    valid_components = intensity_function.weights > 1e-7
+    valid_components = intensity_function.weights > 1e-20
     estimated_cardinality = jnp.floor(
         jnp.sum(jnp.where(valid_components, intensity_function.weights, 0))
     )
@@ -550,6 +641,12 @@ for _ in range(50):
     true_state = RFS(
         eqx.filter_vmap(system.flow)(0.0, 1.0, true_state.state),
         mask=jnp.array([True, True]),
+    )
+
+    intensity_function = GMM(
+        means=eqx.filter_vmap(system.flow)(0.0, 1.0, intensity_function.means),
+        covs=intensity_function.covs,
+        weights=0.99 * intensity_function.weights,
     )
 
 

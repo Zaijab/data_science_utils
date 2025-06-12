@@ -597,8 +597,8 @@ def extract_states_simple(
 @eqx.filter_jit
 @jaxtyped(typechecker=typechecker)
 def compute_ospa_cost_matrix(
-    estimates: Float[Array, "m 6"],
-    truth: Float[Array, "n 6"],
+    estimates: Float[Array, "m 3"],
+    truth: Float[Array, "n 3"],
     cutoff: float = 100.0,
     p: int = 2,
 ) -> Float[Array, "m n"]:
@@ -625,8 +625,8 @@ def compute_ospa_cost_matrix(
 @eqx.filter_jit
 @jaxtyped(typechecker=typechecker)
 def compute_ospa_metric(
-    estimates: Float[Array, "m 6"],
-    truth: Float[Array, "n 6"],
+    estimates: Float[Array, "m 3"],
+    truth: Float[Array, "n 3"],
     cutoff: float = 100.0,
     p: int = 2,
 ) -> Float[Array, ""]:
@@ -732,7 +732,7 @@ for _ in range(100):
         0.98,
     )
 
-    valid_components = intensity_function.weights > 1e-5
+    valid_components = intensity_function.weights > 0.5
     estimated_cardinality = jnp.floor(
         jnp.sum(jnp.where(valid_components, intensity_function.weights, 0))
     )
@@ -740,7 +740,8 @@ for _ in range(100):
     estimated_weights = jnp.where(valid_components, intensity_function.weights, 0.0)
     estimated_states = jnp.where(
         valid_components[:, None], intensity_function.means, 0.0
-    )
+    )[:, :3]
+    # print(estimated_states)
 
     max_targets = 10  # compile-time constant
 
@@ -749,9 +750,11 @@ for _ in range(100):
     final_weights = estimated_weights[sorted_indices]
     valid_estimates_mask = final_weights > 1e-5
 
-    ospa = compute_ospa_metric(final_estimates, true_state.state, cutoff=100.0, p=2)
+    # ospa = compute_ospa_metric(
+    #     final_estimates[:, :3], true_state.state[:, 3], cutoff=100.0, p=2
+    # )
     distance, localization, cardinality = compute_ospa_components(
-        final_estimates, true_state.state
+        final_estimates[:, :3], true_state.state[:, :3]
     )
     ospa_distance.append(distance)
     ospa_localization.append(localization)

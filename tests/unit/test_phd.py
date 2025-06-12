@@ -180,28 +180,28 @@ class EnGMPHD(eqx.Module, strict=True):
             measurement_jacobian @ prior_mixture_covariance @ measurement_jacobian.T
             + measurement_device_covariance
         )
-        innovation_cov = (innovation_cov + innovation_cov.T) / 2  # Symmetrize
+        # innovation_cov = (innovation_cov + innovation_cov.T) / 2  # Symmetrize
 
         kalman_gain = (
             prior_mixture_covariance
             @ measurement_jacobian.T
-            @ jnp.linalg.pinv(innovation_cov)
+            @ jnp.linalg.inv(innovation_cov)
         )
 
         if self.debug:
             assert isinstance(kalman_gain, Float[Array, "state_dim measurement_dim"])
 
+        gaussian_mixture_covariance = (
+            jnp.eye(point.shape[0]) - kalman_gain @ measurement_jacobian
+        ) @ prior_mixture_covariance  # + 1e-10 * jnp.eye(point.shape[0])
+        # I_minus_KH = jnp.eye(point.shape[0]) - kalman_gain @ measurement_jacobian
         # gaussian_mixture_covariance = (
-        # jnp.eye(point.shape[0]) - kalman_gain @ measurement_jacobian
-        # ) @ prior_mixture_covariance + 1e-10 * jnp.eye(point.shape[0])
-        I_minus_KH = jnp.eye(point.shape[0]) - kalman_gain @ measurement_jacobian
-        gaussian_mixture_covariance = (
-            I_minus_KH @ prior_mixture_covariance @ I_minus_KH.T
-            + kalman_gain @ measurement_device_covariance @ kalman_gain.T
-        )
-        gaussian_mixture_covariance = (
-            gaussian_mixture_covariance + gaussian_mixture_covariance.T
-        ) / 2
+        #     I_minus_KH @ prior_mixture_covariance @ I_minus_KH.T
+        #     + kalman_gain @ measurement_device_covariance @ kalman_gain.T
+        # )
+        # gaussian_mixture_covariance = (
+        #     gaussian_mixture_covariance + gaussian_mixture_covariance.T
+        # ) / 2
 
         if self.debug:
             assert isinstance(
@@ -217,7 +217,7 @@ class EnGMPHD(eqx.Module, strict=True):
             measurement_jacobian @ prior_mixture_covariance @ measurement_jacobian.T
             + measurement_device_covariance
         )
-        log_posterior_cov = (log_posterior_cov + log_posterior_cov.T) / 2
+        # log_posterior_cov = (log_posterior_cov + log_posterior_cov.T) / 2
         logposterior_weights = jsp.stats.multivariate_normal.logpdf(
             measurement,
             ybar,
@@ -330,11 +330,12 @@ class EnGMPHD(eqx.Module, strict=True):
             assert isinstance(posterior_weights, Float[Array, "batch_dim"])
 
         # Prevent Degenerate Particles
+        p = posterior_gmm.weights / jnp.sum(posterior_gmm.weights)
         variable = jax.random.choice(
             subkey,
             posterior_gmm.means.shape[0],
             shape=(posterior_gmm.means.shape[0],),
-            p=posterior_gmm.weights,
+            p=p,
         )
         posterior_ensemble = posterior_gmm.means[variable, ...]
         posterior_covariances = posterior_gmm.covs[variable, ...]
@@ -421,179 +422,6 @@ def union(rfs1: RFS, rfs2: RFS) -> RFS:
     return RFS(combined_state, combined_mask)
 
 
-@jaxtyped(typechecker=typechecker)
-@eqx.filter_jit
-def ospa_metric(
-    estimates: Float[Array, "m 3"],  # Position estimates only
-    truth: Float[Array, "n 3"],  # True positions
-    cutoff: float = 100.0,
-    p: int = 2,
-) -> Float[Array, ""]:
-    """
-    Compute OSPA metric between estimated and true target positions.
-
-    Args:
-        estimates: Estimated target positions [m, 3]
-        truth: True target positions [n, 3]
-        cutoff: Cutoff parameter c
-        p: Norm parameter
-
-    Returns:
-        OSPA distance scalar
-    """
-    m, n = estimates.shape[0], truth.shape[0]
-
-    # Handle empty cases
-    if m == 0 and n == 0:
-        return 0.0
-    if m == 0:
-        return cutoff  # Only cardinality error
-    if n == 0:
-        return cutoff  # Only cardinality error
-
-    # Ensure m <= n by swapping if necessary
-    # (OSPA is not symmetric, truth should be larger set)
-
-    # Compute distance matrix with cutoff
-    distances = jnp.linalg.norm(estimates[:, None, :] - truth[None, :, :], axis=2)
-    distances_cutoff = jnp.minimum(distances, cutoff)
-
-    # Solve assignment problem using Hungarian algorithm approximation
-    # For JAX, we use a differentiable approximation
-    assignment_costs = hungarian_assignment(distances_cutoff)
-
-    # Compute OSPA
-    localization_error = jnp.sum(assignment_costs**p)
-    cardinality_error = (n - m) * (cutoff**p)
-
-    total_error = (localization_error + cardinality_error) / n
-    ospa_distance = total_error ** (1.0 / p)
-
-    return ospa_distance
-
-
-@jaxtyped(typechecker=typechecker)
-@eqx.filter_jit
-def hungarian_assignment(cost_matrix: Float[Array, "m n"]) -> Float[Array, "m"]:
-    """
-    Differentiable approximation to Hungarian algorithm using Sinkhorn.
-    Returns the minimum cost assignment for each row.
-    """
-    # Use Sinkhorn algorithm as differentiable approximation
-    # to Hungarian algorithm (exact Hungarian not differentiable)
-
-    # Sinkhorn iterations
-    epsilon = 0.1
-    max_iter = 100
-
-    # Convert costs to probabilities
-    K = jnp.exp(-cost_matrix / epsilon)
-
-    # Sinkhorn normalization
-    u = jnp.ones(cost_matrix.shape[0]) / cost_matrix.shape[0]
-
-    def sinkhorn_step(u):
-        v = 1.0 / (K.T @ u)
-        u = 1.0 / (K @ v)
-        return u
-
-    # Run Sinkhorn iterations
-    for _ in range(max_iter):
-        u = sinkhorn_step(u)
-
-    v = 1.0 / (K.T @ u)
-    transport_matrix = jnp.diag(u) @ K @ jnp.diag(v)
-
-    # Extract assignment costs
-    assignment_costs = jnp.sum(transport_matrix * cost_matrix, axis=1)
-
-    return assignment_costs
-
-
-# Alternative: Use scipy.optimize.linear_sum_assignment (non-differentiable)
-def ospa_metric_exact(estimates, truth, cutoff=100.0, p=2):
-    """Exact OSPA using scipy Hungarian algorithm (for validation)."""
-    from scipy.optimize import linear_sum_assignment
-
-    m, n = len(estimates), len(truth)
-    if m == 0 and n == 0:
-        return 0.0
-    if m == 0 or n == 0:
-        return cutoff
-
-    # Compute distance matrix
-    distances = np.linalg.norm(estimates[:, None, :] - truth[None, :, :], axis=2)
-    distances_cutoff = np.minimum(distances, cutoff)
-
-    # Pad matrix if needed for Hungarian algorithm
-    if m > n:
-        distances_cutoff = np.pad(
-            distances_cutoff, ((0, 0), (0, m - n)), constant_values=cutoff
-        )
-    elif n > m:
-        distances_cutoff = np.pad(
-            distances_cutoff, ((0, n - m), (0, 0)), constant_values=cutoff
-        )
-
-    # Solve assignment
-    row_indices, col_indices = linear_sum_assignment(distances_cutoff)
-    assignment_costs = distances_cutoff[row_indices, col_indices]
-
-    # Compute OSPA
-    localization_error = np.sum(assignment_costs[: min(m, n)] ** p)
-    cardinality_error = abs(n - m) * (cutoff**p)
-
-    total_error = (localization_error + cardinality_error) / max(m, n)
-    return total_error ** (1.0 / p)
-
-
-@jaxtyped(typechecker=typechecker)
-@eqx.filter_jit
-def extract_states_from_gmm(
-    gmm: GMM, weight_threshold: float = 0.5
-) -> tuple[Float[Array, "max_targets 3"], int]:
-    """
-    Extract discrete target estimates from GMM intensity function.
-    Uses weight thresholding similar to GM-PHD approach.
-    """
-    max_targets = 10  # Fixed size for JAX compatibility
-
-    # Find indices where weights > threshold
-    valid_indices = jnp.where(
-        gmm.weights > weight_threshold,
-        size=max_targets,  # Maximum number to extract
-        fill_value=-1,  # Invalid index marker
-    )[0]
-
-    # Count actual valid targets (indices that aren't -1)
-    num_estimated = jnp.sum(valid_indices >= 0)
-
-    # Extract positions, handling invalid indices
-    def get_position(idx):
-        return jax.lax.cond(idx >= 0, lambda: gmm.means[idx, :3], lambda: jnp.zeros(3))
-
-    estimated_positions = jax.vmap(get_position)(valid_indices)
-
-    return estimated_positions, num_estimated
-
-
-# Alternative: Simpler approach using masking
-@jaxtyped(typechecker=typechecker)
-@eqx.filter_jit
-def extract_states_simple(
-    gmm: GMM, weight_threshold: float = 0.5
-) -> tuple[Float[Array, "num_components 3"], Float[Array, ""]]:
-    """
-    Simple extraction that returns all components with their weights.
-    Filtering happens outside this function.
-    """
-    positions = gmm.means[:, :3]
-    weights = jnp.where(gmm.weights > weight_threshold, gmm.weights, 0.0)
-    num_estimated = jnp.sum(weights > 0)
-
-    return positions, weights, num_estimated
-
-
 @eqx.filter_jit
 @jaxtyped(typechecker=typechecker)
 def compute_ospa_cost_matrix(
@@ -620,48 +448,6 @@ def compute_ospa_cost_matrix(
 
     assert costs.shape == (estimates.shape[0], truth.shape[0])
     return costs
-
-
-@eqx.filter_jit
-@jaxtyped(typechecker=typechecker)
-def compute_ospa_metric(
-    estimates: Float[Array, "m 3"],
-    truth: Float[Array, "n 3"],
-    cutoff: float = 100.0,
-    p: int = 2,
-) -> Float[Array, ""]:
-    """Compute OSPA metric between estimate and truth sets."""
-
-    m, n = estimates.shape[0], truth.shape[0]
-    max_card = jnp.maximum(m, n)
-
-    if m == 0 and n == 0:
-        return 0.0
-
-    if m == 0:
-        # No estimates, all truth states contribute cutoff cost
-        return cutoff
-
-    if n == 0:
-        # No truth states, all estimates contribute cutoff cost
-        return cutoff
-
-    # Compute cost matrix
-    cost_matrix = compute_ospa_cost_matrix(estimates, truth, cutoff, p)
-
-    # Solve assignment problem
-    row_indices, col_indices = optax.assignment.hungarian_algorithm(cost_matrix)
-
-    # Compute assignment cost
-    assignment_cost = cost_matrix[row_indices, col_indices].sum()
-
-    # Add cardinality penalty
-    cardinality_penalty = cutoff**p * jnp.abs(m - n)
-
-    # Total OSPA cost
-    total_cost = (assignment_cost + cardinality_penalty) / max_card
-
-    return total_cost ** (1.0 / p)
 
 
 @jaxtyped(typechecker=typechecker)
@@ -699,7 +485,7 @@ ospa_distance = []
 ospa_localization = []
 ospa_cardinality = []
 
-for _ in range(100):
+for _ in range(50):
     print(_, end=": ")
     # Births
     # Add 10 more Gaussian Terms
@@ -732,7 +518,7 @@ for _ in range(100):
         0.98,
     )
 
-    valid_components = intensity_function.weights > 0.5
+    valid_components = intensity_function.weights > 1e-7
     estimated_cardinality = jnp.floor(
         jnp.sum(jnp.where(valid_components, intensity_function.weights, 0))
     )

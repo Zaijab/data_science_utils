@@ -1,36 +1,16 @@
-# Test implementation
-import jax
-import jax.numpy as jnp
+import os
+from typing import List
 
-from data_science_utils.statistics import GMM as GMM
-
-
-import pytest
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
-import os
-from typing import List
+import pytest
+from beartype import beartype as typechecker
+from jaxtyping import Array, Float, jaxtyped
 
-# Assuming the MaskedGMM code is in a module called masked_gmm
 from data_science_utils.statistics import GMM
-
-import pytest
-import jax
-import jax.numpy as jnp
-import matplotlib.pyplot as plt
-import numpy as np
-import os
-from typing import List
-
-import pytest
-import jax
-import jax.numpy as jnp
-import matplotlib.pyplot as plt
-import numpy as np
-import os
-from typing import List
+from data_science_utils.statistics import GMM as GMM
 
 
 def create_sample_gmms() -> List[GMM]:
@@ -93,3 +73,16 @@ def test_gmm_sampling():
     sample = gmm.sample(key)
     assert sample.shape == (2,)
     assert jnp.all(jnp.isfinite(sample))
+
+
+def test_gmm_jaxtyping() -> None:
+    key = jax.random.key(42)
+    gmms = create_sample_gmms()
+    gmm = gmms[1]
+
+    @jaxtyped(typechecker=typechecker)
+    def interior_function(gmm: GMM) -> GMM:
+        return gmm
+
+    print(gmm)
+    interior_function(gmm)

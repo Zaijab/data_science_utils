@@ -1,6 +1,7 @@
-import equinox as eqx
 import abc
-from jaxtyping import Array
+
+import equinox as eqx
+from jaxtyping import Array, Key
 
 
 class AbstractMeasurementSystem(eqx.Module, strict=True):
@@ -12,7 +13,7 @@ class AbstractMeasurementSystem(eqx.Module, strict=True):
         pass
 
     @abc.abstractmethod
-    def __call__(self, state, key):
+    def __call__(self, state, key: Key[Array, "..."] | None = None):
         """
         Generate a measurement from a state, potentially with noise.
 

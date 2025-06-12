@@ -9,5 +9,11 @@ from data_science_utils.statistics.epanechnikov import (
 
 from data_science_utils.statistics.gaussian_mixture_model import (
     GMM as GMM,
-    #    MaskedGMM as MaskedGMM,
+    merge_gmms as merge_gmms,
+)
+
+from data_science_utils.statistics.random_finite_sets import RFS as RFS
+
+from data_science_utils.statistics.poisson_point_process import (
+    poisson_point_process_rectangular_region as poisson_point_process_rectangular_region,
 )

@@ -111,3 +111,42 @@ def merge_gmms(
     return GMM(
         samples, jnp.tile(covariance, (target_components, 1, 1)), uniform_weights
     )
+
+
+@jaxtyped(typechecker=typechecker)
+@eqx.filter_jit
+def merge_gmms(
+    gmm1: GMM, gmm2: GMM, key: Key[Array, ""], target_components: int = 250
+) -> GMM:
+    target_components = min(
+        target_components, gmm1.weights.shape[0] + gmm2.weights.shape[0]
+    )
+    # Compute total weights
+    W1 = jnp.sum(gmm1.weights)
+    W2 = jnp.sum(gmm2.weights)
+    Z = W1 + W2
+
+    # Sample target_components points using Algorithm 2 logic
+    uniform_keys = jax.random.split(key, target_components)
+
+    def sample_one(key_i):
+        u = jax.random.uniform(key_i)
+        return jax.lax.cond(
+            u < W1 / Z, lambda: gmm1.sample(key_i), lambda: gmm2.sample(key_i)
+        )
+
+    samples = jax.vmap(sample_one)(uniform_keys)
+
+    # Reconstruct GMM with uniform weights
+    uniform_weights = jnp.full(
+        target_components, jnp.array([W1 + W2]) / target_components
+    )
+    spatial_dimension = gmm1.means.shape[1]
+    silverman_beta = (
+        ((4) / (spatial_dimension + 2)) ** (2 / (spatial_dimension + 4))
+    ) * ((target_components) ** (-(2) / (spatial_dimension + 4)))
+    covariance = (silverman_beta / Z) * jnp.cov(samples.T)
+
+    return GMM(
+        samples, jnp.tile(covariance, (target_components, 1, 1)), uniform_weights
+    )

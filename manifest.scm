@@ -1025,6 +1025,8 @@ need to use the older and less efficient @code{pkg_resources} package.")
     (license license:asl2.0)))
 
 
+;; TODO INSTALL OPTINA FOR HYPERPARAMETER SEARCH
+
 (packages->manifest (list
 		     python
 		     jupyter

@@ -55,98 +55,12 @@ birth_gmms = GMM(
 
 @jaxtyped(typechecker=typechecker)
 @eqx.filter_jit
-def sample_from_multiple_gmms(
-    means: Float[Array, "num_gmms num_components state_dim"],
-    weights: Float[Array, "num_gmms num_components"],
-    covs: Float[Array, "num_gmms num_components state_dim state_dim"],
-    valid_mask: Bool[Array, "num_gmms"],
-    key: Key[Array, ""],
-    target_components: int = 250,
-) -> GMM:
-    # Flatten valid GMMs into single arrays
-    valid_means = means[valid_mask].reshape(-1, means.shape[-1])
-    valid_weights = weights[valid_mask].reshape(-1)
-    valid_covs = covs[valid_mask].reshape(-1, covs.shape[-2], covs.shape[-1])
-
-    # Normalize weights
-    total_weight = jnp.sum(valid_weights)
-    probs = valid_weights / total_weight
-
-    # Sample components according to weights
-    uniform_keys = jax.random.split(key, target_components)
-    component_indices = jax.vmap(
-        lambda k: jax.random.choice(k, valid_means.shape[0], p=probs)
-    )(uniform_keys)
-
-    # Sample from selected components
-    samples = jax.vmap(
-        lambda k, idx: jax.random.multivariate_normal(
-            k, valid_means[idx], valid_covs[idx]
-        )
-    )(uniform_keys, component_indices)
-
-    # Reconstruct with KDE
-    uniform_weights = jnp.full(target_components, total_weight / target_components)
-    silverman_beta = ((4 / (means.shape[-1] + 2)) ** (2 / (means.shape[-1] + 4))) * (
-        target_components ** (-2 / (means.shape[-1] + 4))
-    )
-    covariance = silverman_beta * jnp.cov(samples.T)
-
-    return GMM(
-        samples, jnp.tile(covariance, (target_components, 1, 1)), uniform_weights
-    )
-
-
-@jaxtyped(typechecker=typechecker)
-@eqx.filter_jit
-def sample_from_multiple_gmms(
-    means: Float[Array, "num_gmms num_components state_dim"],
-    weights: Float[Array, "num_gmms num_components"],
-    covs: Float[Array, "num_gmms num_components state_dim state_dim"],
-    valid_mask: Bool[Array, "num_gmms"],
-    key: Key[Array, ""],
-    target_components: int = 250,
-) -> GMM:
-    # Flatten all arrays
-    flat_means = means.reshape(-1, means.shape[-1])
-    flat_weights = weights.reshape(-1)
-    flat_covs = covs.reshape(-1, covs.shape[-2], covs.shape[-1])
-
-    # Expand mask to match flattened shape and zero out invalid weights
-    expanded_mask = jnp.repeat(valid_mask, weights.shape[1])
-    masked_weights = jnp.where(expanded_mask, flat_weights, 0.0)
-
-    # Normalize weights
-    total_weight = jnp.sum(masked_weights)
-    probs = masked_weights / jnp.maximum(total_weight, 1e-10)
-
-    # Sample from mixture
-    uniform_keys = jax.random.split(key, target_components)
-    indices = jax.vmap(lambda k: jax.random.choice(k, flat_means.shape[0], p=probs))(
-        uniform_keys
-    )
-    samples = jax.vmap(
-        lambda k, i: jax.random.multivariate_normal(k, flat_means[i], flat_covs[i])
-    )(uniform_keys, indices)
-
-    # Apply KDE
-    uniform_weights = jnp.full(target_components, total_weight / target_components)
-    beta = ((4 / (means.shape[-1] + 2)) ** (2 / (means.shape[-1] + 4))) * (
-        target_components ** (-2 / (means.shape[-1] + 4))
-    )
-    cov = beta * jnp.cov(samples.T)
-
-    return GMM(samples, jnp.tile(cov, (target_components, 1, 1)), uniform_weights)
-
-
-@jaxtyped(typechecker=typechecker)
-@eqx.filter_jit
 def sample_from_large_gmm(
     means: Float[Array, "num_components state_dim"],
     weights: Float[Array, "num_components"],
     covs: Float[Array, "num_components state_dim state_dim"],
     key: Key[Array, ""],
-    target_components: int = 250,
+    target_components: int = 2,
 ) -> GMM:
     # Normalize weights
     probs = weights / jnp.sum(weights)
@@ -384,7 +298,6 @@ class EnGMPHD(eqx.Module, strict=True):
         missed_means = prior_gmm.means
         missed_covs = prior_gmm.covs
 
-        # Detection (flatten your computed arrays)
         flat_detection_weights = normalized_weights.reshape(-1)
         flat_detection_means = posterior_ensemble.reshape(
             -1, posterior_ensemble.shape[-1]
@@ -393,7 +306,6 @@ class EnGMPHD(eqx.Module, strict=True):
             -1, *posterior_covariances.shape[-2:]
         )
 
-        # Concatenate
         final_weights = jnp.concatenate([missed_weights, flat_detection_weights])
         final_means = jnp.concatenate([missed_means, flat_detection_means])
         final_covs = jnp.concatenate([missed_covs, flat_detection_covs])
@@ -476,12 +388,12 @@ class Radar(AbstractMeasurementSystem, strict=True):
             detected = jax.random.bernoulli(
                 detection_key, p=0.98, shape=(positions.state.shape[0],)
             )
-            detected = detected & positions.mask  # Only detect valid positions
+            detected = detected & positions.mask
             return measurements, detected
 
 
 range_std = 1.0
-angle_std = 0.5 * jnp.pi / 180  # 0.5 degrees in radians
+angle_std = 0.5 * jnp.pi / 180
 R = jnp.diag(jnp.array([range_std**2, angle_std**2, angle_std**2]))
 measurement_system = Radar(R)
 
@@ -522,9 +434,8 @@ def compute_ospa_cost_matrix(
 ) -> Float[Array, "m n"]:
     """Compute cost matrix for OSPA metric using Euclidean distance on positions."""
 
-    # Extract positions (first 3 dimensions)
-    est_pos = estimates[:, :3]  # Shape: (m, 3)
-    truth_pos = truth[:, :3]  # Shape: (n, 3)
+    est_pos = estimates[:, :3]
+    truth_pos = truth[:, :3]
 
     assert est_pos.shape[1] == 3
     assert truth_pos.shape[1] == 3
@@ -549,11 +460,9 @@ def compute_ospa_components(estimates, truth, cutoff=100.0, p=2):
         return 0.0
 
     if m == 0:
-        # No estimates, all truth states contribute cutoff cost
         return cutoff
 
     if n == 0:
-        # No truth states, all estimates contribute cutoff cost
         return cutoff
 
     cost_matrix = compute_ospa_cost_matrix(estimates, truth, cutoff, p)
@@ -575,7 +484,7 @@ ospa_distance = []
 ospa_localization = []
 ospa_cardinality = []
 
-for _ in range(50):
+for _ in range(3):
     print(_, end=": ")
     # Births
     # Add 10 more Gaussian Terms
@@ -589,8 +498,9 @@ for _ in range(50):
         clutter_region,
         clutter_max_points,
     )
-    true_state_position = RFS(true_state.state[:, :3], true_state.mask)
+    clutter = clutter.state[clutter.mask]
 
+    true_state_position = RFS(true_state.state[:, :3], true_state.mask)
     all_measureables = union(true_state_position, clutter)
 
     # Generate Measurements based on all available information
@@ -609,7 +519,7 @@ for _ in range(50):
     )
     print(jnp.sort(intensity_function.weights)[:20])
 
-    valid_components = intensity_function.weights > 1e-20
+    valid_components = intensity_function.weights > 0.5
     estimated_cardinality = jnp.floor(
         jnp.sum(jnp.where(valid_components, intensity_function.weights, 0))
     )

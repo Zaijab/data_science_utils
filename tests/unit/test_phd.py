@@ -96,7 +96,6 @@ range_std = 1.0
 angle_std = 0.5 * jnp.pi / 180
 R = jnp.diag(jnp.array([range_std**2, angle_std**2, angle_std**2]))
 measurement_system = Radar(R)
-print(measurement_system)
 stochastic_filter = EnGMPHD(debug=True)
 
 
@@ -217,18 +216,15 @@ for _ in range(30):
         measurements,
         measurement_system,
     )
-    print(jnp.sort(intensity_function.weights)[:20])
 
-    #     valid_components = intensity_function.weights > 0.5
-    #     estimated_cardinality = jnp.floor(
-    #         jnp.sum(jnp.where(valid_components, intensity_function.weights, 0))
-    #     )
-    #     print(estimated_cardinality)
-    #     estimated_weights = jnp.where(valid_components, intensity_function.weights, 0.0)
-    #     estimated_states = jnp.where(
-    #         valid_components[:, None], intensity_function.means, 0.0
-    #     )[:, :3]
-    #     # print(estimated_states)
+    valid_components = intensity_function.weights > 0.5
+    estimated_cardinality = jnp.sum(intensity_function.weights)
+    print(jnp.sum(valid_components))
+    estimated_weights = jnp.where(valid_components, intensity_function.weights, 0.0)
+    estimated_states = jnp.where(
+        valid_components[:, None], intensity_function.means, 0.0
+    )[:, :3]
+    # print(estimated_states)
 
     #     max_targets = 10  # compile-time constant
 
@@ -247,18 +243,15 @@ for _ in range(30):
     #     ospa_localization.append(localization)
     #     ospa_cardinality.append(cardinality)
 
-    #     key, subkey = jax.random.split(key)
-    #     true_state = RFS(
-    #         eqx.filter_vmap(system.flow)(0.0, 1.0, true_state.state),
-    #         mask=jnp.array([True, True]),
-    #     )
+    key, subkey = jax.random.split(key)
+    true_state = eqx.filter_vmap(system.flow)(0.0, 1.0, true_state)
 
-    #     intensity_function = GMM(
-    #         means=eqx.filter_vmap(system.flow)(0.0, 1.0, intensity_function.means),
-    #         covs=intensity_function.covs,
-    #         weights=0.99 * intensity_function.weights,
-    #     )
-    # break
+    intensity_function = GMM(
+        means=eqx.filter_vmap(system.flow)(0.0, 1.0, intensity_function.means),
+        covs=intensity_function.covs,
+        weights=0.99 * intensity_function.weights,
+    )
+
 
 # plt.plot(ospa_distance)
 # plt.show()

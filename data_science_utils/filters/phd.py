@@ -275,7 +275,7 @@ class EnGMPHD(eqx.Module, strict=True):
     sampling_function: jax.tree_util.Partial = jax.tree_util.Partial(
         sample_gaussian_mixture
     )
-    clutter_density: float = 6.25e-8
+    clutter_density: float = 6.25e-7
     detection_probability: float = 0.98
 
     @jaxtyped(typechecker=typechecker)
@@ -353,37 +353,36 @@ class EnGMPHD(eqx.Module, strict=True):
         measurements: Float[Array, "num_measurements measurement_dim"],
         measurement_system: AbstractMeasurementSystem,
     ) -> GMM:
-        subkey: Key[Array, ""]
-        subkeys: Key[Array, "batch_dim"]
 
         prior_ensemble = prior_gmm.means
         prior_covs = prior_gmm.covs
         prior_weights = prior_gmm.weights
-
-        key, subkey, *subkeys = jax.random.split(key, 2 + prior_ensemble.shape[0])
-        subkeys = jnp.array(subkeys)
-
-        if self.debug:
-            assert isinstance(subkeys, Key[Array, "batch_dim"])
-
         bandwidth = (
             (4) / (prior_ensemble.shape[0] * (prior_ensemble.shape[-1] + 2))
         ) ** ((2) / (prior_ensemble.shape[-1] + 4))
         emperical_covariance = jnp.cov(prior_ensemble.T)
 
-        state_dim = emperical_covariance.shape[0]
-        i_indices = jnp.arange(state_dim)[:, None]
-        j_indices = jnp.arange(state_dim)[None, :]
-        distances = jnp.abs(i_indices - j_indices)
+        if self.debug:
+            assert isinstance(prior_gmm.means, Float[Array, "num_components state_dim"])
+            assert isinstance(
+                prior_gmm.covs, Float[Array, "num_components state_dim state_dim"]
+            )
+            assert isinstance(prior_gmm.weights, Float[Array, "num_components"])
 
-        L = 3.0  # or 4.0
-        rho = jnp.exp(-(distances**2) / (2 * L**2))
+        # Localization
+        # state_dim = emperical_covariance.shape[0]
+        # i_indices = jnp.arange(state_dim)[:, None]
+        # j_indices = jnp.arange(state_dim)[None, :]
+        # distances = jnp.abs(i_indices - j_indices)
 
-        emperical_covariance = emperical_covariance * rho
+        # L = 3.0  # or 4.0
+        # rho = jnp.exp(-(distances**2) / (2 * L**2))
+
+        # emperical_covariance = emperical_covariance * rho
+
         mixture_covariance = bandwidth * emperical_covariance
 
         if self.debug:
-            # jax.debug.callback(is_positive_definite, emperical_covariance)
             assert isinstance(emperical_covariance, Float[Array, "state_dim state_dim"])
             assert isinstance(mixture_covariance, Float[Array, "state_dim state_dim"])
 
@@ -400,92 +399,48 @@ class EnGMPHD(eqx.Module, strict=True):
             process_measurement
         )(measurements)
 
-        print(posterior_ensemble)
+        detection_weights = (
+            self.detection_probability
+            * prior_weights[None, :]
+            * jnp.exp(logposterior_weights)
+        )
+        denominators = self.clutter_density + jnp.sum(
+            detection_weights, axis=1, keepdims=True
+        )
+        normalized_detection_weights = detection_weights / denominators
 
-        logposterior_weights = logposterior_weights[:, :]
-        print(logposterior_weights)
-
-        # Scale Weights
-        def logsumexp_per_measurement(logposterior_weights):
-            m = jnp.max(logposterior_weights)
-            g = m + jnp.log(jnp.sum(jnp.exp(logposterior_weights - m)))
-            posterior_weights = jnp.exp(logposterior_weights - g)
-
-        # log_normalizer = jax.scipy.special.logsumexp(
-        #     logposterior_weights, axis=1, keepdims=True
-        # )
-        # posterior_weights = jnp.exp(logposterior_weights - log_normalizer)
-        # posterior_weights = jnp.exp(logposterior_weights)
-
-        # detection_weights = (
-        #     detection_probability * prior_weights[None, :] * posterior_weights
-        # )
-        # denominators = clutter_density + jnp.sum(
-        #     detection_weights, axis=1, keepdims=True
-        # )
-        # normalized_weights = jnp.where(
-        #     measurements_mask[:, None], detection_weights / denominators, 0.0
-        # )
-
-        key, subkey = jax.random.split(key)
-
-        # Missed detection
         missed_weights = (1 - self.detection_probability) * prior_weights
-        missed_means = prior_gmm.means
-        missed_covs = prior_gmm.covs
 
-        flat_detection_weights = normalized_weights.reshape(-1)
-        flat_detection_means = posterior_ensemble.reshape(
-            -1, posterior_ensemble.shape[-1]
+        flat_weights = jnp.concatenate(
+            [missed_weights, normalized_detection_weights.reshape(-1)]
         )
-        flat_detection_covs = posterior_covariances.reshape(
-            -1, *posterior_covariances.shape[-2:]
+        flat_means = jnp.concatenate(
+            [
+                prior_gmm.means,
+                posterior_ensemble.reshape(-1, posterior_ensemble.shape[-1]),
+            ]
         )
-
-        final_weights = jnp.concatenate([missed_weights, flat_detection_weights])
-        final_means = jnp.concatenate([missed_means, flat_detection_means])
-        final_covs = jnp.concatenate([missed_covs, flat_detection_covs])
-
-        posterior_gmm = sample_from_large_gmm(
-            final_means,
-            final_weights,
-            final_covs,
-            subkey,
-            250,
+        flat_covs = jnp.concatenate(
+            [
+                prior_gmm.covs,
+                posterior_covariances.reshape(-1, *posterior_covariances.shape[-2:]),
+            ]
         )
 
-        if self.debug:
-            assert isinstance(posterior_ensemble, Float[Array, "batch_dim state_dim"])
-            assert isinstance(logposterior_weights, Float[Array, "batch_dim"])
-            assert isinstance(
-                posterior_covariances, Float[Array, "batch_dim state_dim state_dim"]
-            )
-            jax.self.debug.callback(has_nan, posterior_covariances)
-
-        # Missed Detection and Clutter
-
-        if self.debug:
-            assert isinstance(posterior_weights, Float[Array, "batch_dim"])
-
-        # Prevent Degenerate Particles
-        p = posterior_gmm.weights / jnp.sum(posterior_gmm.weights)
-        variable = jax.random.choice(
-            subkey,
-            posterior_gmm.means.shape[0],
-            shape=(posterior_gmm.means.shape[0],),
-            p=p,
-        )
-        posterior_ensemble = posterior_gmm.means[variable, ...]
-        posterior_covariances = posterior_gmm.covs[variable, ...]
-
-        if self.debug:
-            jax.self.debug.callback(has_nan, posterior_covariances)
-
-        posterior_samples = self.sampling_function(
-            subkeys, posterior_ensemble, posterior_covariances
+        intensity_function = GMM(means=flat_means, covs=flat_covs, weights=flat_weights)
+        key, subkey = jax.random.split(key)
+        posterior_gmm_means = eqx.filter_vmap(intensity_function.sample)(
+            jax.random.split(subkey, 250)
         )
 
-        if self.debug:
-            assert isinstance(posterior_weights, Float[Array, "batch_dim"])
+        target_components = 250
 
-        return GMM(posterior_samples, posterior_covariances, posterior_gmm.weights)
+        posterior_gmm = GMM(
+            posterior_gmm_means,
+            jnp.tile(
+                bandwidth * jnp.cov(posterior_gmm_means.T), (target_components, 1, 1)
+            ),
+            jnp.full(target_components, jnp.sum(flat_weights) / target_components),
+        )
+
+        return posterior_gmm

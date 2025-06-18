@@ -7,7 +7,7 @@ import equinox as eqx
 from jaxtyping import jaxtyped, Float, Array, Key
 from beartype import beartype as typechecker
 from typing import Any
-from data_science_utils.measurement_functions import AbstractMeasurementSystem
+from data_science_utils.measurement_systems import AbstractMeasurementSystem
 from evosax import CMA_ES
 
 

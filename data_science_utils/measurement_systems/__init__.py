@@ -5,3 +5,8 @@ from data_science_utils.measurement_systems.norms import (
 from data_science_utils.measurement_systems.abc import (
     AbstractMeasurementSystem as AbstractMeasurementSystem,
 )
+
+from data_science_utils.measurement_systems.radar import (
+    Radar as Radar,
+    RadarRFS as RadarRFS,
+)

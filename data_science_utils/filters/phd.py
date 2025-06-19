@@ -275,7 +275,8 @@ class EnGMPHD(eqx.Module, strict=True):
     sampling_function: jax.tree_util.Partial = jax.tree_util.Partial(
         sample_gaussian_mixture
     )
-    clutter_density: float = 6.25e-7
+    clutter_density: float = 6.25e-8
+    lambda_c: float = 10.0
     detection_probability: float = 0.98
 
     @jaxtyped(typechecker=typechecker)
@@ -317,7 +318,7 @@ class EnGMPHD(eqx.Module, strict=True):
 
         gaussian_mixture_covariance = (
             jnp.eye(point.shape[0]) - kalman_gain @ measurement_jacobian
-        ) @ prior_mixture_covariance  # + 1e-10 * jnp.eye(point.shape[0])
+        ) @ prior_mixture_covariance
 
         if self.debug:
             assert isinstance(
@@ -334,7 +335,7 @@ class EnGMPHD(eqx.Module, strict=True):
             + measurement_device_covariance
         )
         # log_posterior_cov = (log_posterior_cov + log_posterior_cov.T) / 2
-        logposterior_weights = jsp.stats.multivariate_normal.logpdf(
+        logposterior_weights = jsp.stats.multivariate_normal.pdf(
             measurement,
             ybar,
             log_posterior_cov,
@@ -361,6 +362,7 @@ class EnGMPHD(eqx.Module, strict=True):
         bandwidth = (
             (4) / (prior_ensemble.shape[0] * (prior_ensemble.shape[-1] + 2))
         ) ** ((2) / (prior_ensemble.shape[-1] + 4))
+
         emperical_covariance = jnp.cov(prior_ensemble.T)
 
         if self.debug:
@@ -396,24 +398,19 @@ class EnGMPHD(eqx.Module, strict=True):
                 measurement_system.covariance,
             )
 
-        posterior_ensemble, logposterior_weights, posterior_covariances = jax.vmap(
+        posterior_ensemble, posterior_weights, posterior_covariances = jax.vmap(
             process_measurement
         )(measurements)
 
-        if self.debug:
-            assert isinstance(
-                logposterior_weights, Float[Array, "num_measurements num_components"]
-            )
+        missed_weights = (1 - self.detection_probability) * prior_weights
 
         detection_weights = (
-            self.detection_probability
-            * prior_weights[None, :]
-            * jnp.exp(logposterior_weights)
+            self.detection_probability * prior_weights[None, :] * posterior_weights
         )
-        denominators = self.clutter_density + jnp.sum(detection_weights)
+        denominators = self.lambda * self.clutter_density + jnp.sum(
+            detection_weights, axis=1, keepdims=True
+        )
         normalized_detection_weights = detection_weights / denominators
-
-        missed_weights = (1 - self.detection_probability) * prior_weights
 
         flat_weights = jnp.concatenate(
             [missed_weights, normalized_detection_weights.reshape(-1)]
@@ -438,13 +435,22 @@ class EnGMPHD(eqx.Module, strict=True):
         )
 
         target_components = 250
+        estimated_cardinality = jnp.sum(flat_weights)
+        beta_silverman = (1 / estimated_cardinality) * (
+            (4 / (target_components * (state_dim + 2))) ** (2 / (state_dim + 4))
+        )
+        kde_covariance = beta_silverman * jnp.cov(posterior_gmm_means.T)
 
         posterior_gmm = GMM(
             posterior_gmm_means,
             jnp.tile(
-                bandwidth * jnp.cov(posterior_gmm_means.T), (target_components, 1, 1)
+                beta_silverman * jnp.cov(posterior_gmm_means.T),
+                (target_components, 1, 1),
             ),
             jnp.full(target_components, jnp.sum(flat_weights) / target_components),
         )
+
+        jax.debug.print("{}", jnp.sum(detection_weights, axis=1))
+        jax.debug.print("{}", denominators.flatten())
 
         return posterior_gmm

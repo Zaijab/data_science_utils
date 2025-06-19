@@ -342,7 +342,7 @@ class EnGMPHD(eqx.Module, strict=True):
         if self.debug:
             assert isinstance(logposterior_weights, Float[Array, ""])
 
-        return point, jnp.squeeze(logposterior_weights), gaussian_mixture_covariance
+        return point, logposterior_weights, gaussian_mixture_covariance
 
     @jaxtyped(typechecker=typechecker)
     @eqx.filter_jit
@@ -357,6 +357,7 @@ class EnGMPHD(eqx.Module, strict=True):
         prior_ensemble = prior_gmm.means
         prior_covs = prior_gmm.covs
         prior_weights = prior_gmm.weights
+
         bandwidth = (
             (4) / (prior_ensemble.shape[0] * (prior_ensemble.shape[-1] + 2))
         ) ** ((2) / (prior_ensemble.shape[-1] + 4))
@@ -370,15 +371,15 @@ class EnGMPHD(eqx.Module, strict=True):
             assert isinstance(prior_gmm.weights, Float[Array, "num_components"])
 
         # Localization
-        # state_dim = emperical_covariance.shape[0]
-        # i_indices = jnp.arange(state_dim)[:, None]
-        # j_indices = jnp.arange(state_dim)[None, :]
-        # distances = jnp.abs(i_indices - j_indices)
+        state_dim = emperical_covariance.shape[0]
+        i_indices = jnp.arange(state_dim)[:, None]
+        j_indices = jnp.arange(state_dim)[None, :]
+        distances = jnp.abs(i_indices - j_indices)
 
-        # L = 3.0  # or 4.0
-        # rho = jnp.exp(-(distances**2) / (2 * L**2))
+        L = 3.0  # or 4.0
+        rho = jnp.exp(-(distances**2) / (2 * L**2))
 
-        # emperical_covariance = emperical_covariance * rho
+        emperical_covariance = emperical_covariance * rho
 
         mixture_covariance = bandwidth * emperical_covariance
 
@@ -399,14 +400,17 @@ class EnGMPHD(eqx.Module, strict=True):
             process_measurement
         )(measurements)
 
+        if self.debug:
+            assert isinstance(
+                logposterior_weights, Float[Array, "num_measurements num_components"]
+            )
+
         detection_weights = (
             self.detection_probability
             * prior_weights[None, :]
             * jnp.exp(logposterior_weights)
         )
-        denominators = self.clutter_density + jnp.sum(
-            detection_weights, axis=1, keepdims=True
-        )
+        denominators = self.clutter_density + jnp.sum(detection_weights)
         normalized_detection_weights = detection_weights / denominators
 
         missed_weights = (1 - self.detection_probability) * prior_weights

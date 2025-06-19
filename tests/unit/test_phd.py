@@ -186,6 +186,7 @@ ospa_cardinality = []
 for _ in range(30):
     print(_, end=": ")
     intensity_function: GMM = merge_gmms(intensity_function, birth_gmms, key)
+    print(f"Total weight: {jnp.sum(intensity_function.weights):.3f}")
 
     # SKIP GATING
     # Generate Clutter
@@ -217,13 +218,13 @@ for _ in range(30):
         measurement_system,
     )
 
-    valid_components = intensity_function.weights > 0.5
     estimated_cardinality = jnp.sum(intensity_function.weights)
-    print(jnp.sum(valid_components))
-    estimated_weights = jnp.where(valid_components, intensity_function.weights, 0.0)
-    estimated_states = jnp.where(
-        valid_components[:, None], intensity_function.means, 0.0
-    )[:, :3]
+    print(estimated_cardinality)
+
+    sorted_indices = jnp.argsort(intensity_function.weights)[
+        -int(estimated_cardinality) :
+    ]
+    estimated_states = intensity_function.means[sorted_indices]
     # print(estimated_states)
 
     #     max_targets = 10  # compile-time constant

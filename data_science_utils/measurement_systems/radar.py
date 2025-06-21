@@ -22,7 +22,7 @@ class Radar(AbstractMeasurementSystem, strict=True):
     @eqx.filter_jit
     def __call__(
         self,
-        positions: Float[Array, "3"],
+        positions: Float[Array, "3"] | Float[Array, "6"],
         key: Key[Array, ""] | None = None,
     ) -> Float[Array, "3"]:
         x, y, z = positions[0], positions[1], positions[2]

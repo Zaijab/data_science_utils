@@ -20,6 +20,7 @@ from data_science_utils.statistics import (
     poisson_point_process_rectangular_region,
 )
 from data_science_utils.statistics.random_finite_sets import RFS
+from data_science_utils.filters.evaluate import ospa_metric
 
 key = jax.random.key(0)
 key, subkey = jax.random.split(key)
@@ -53,40 +54,6 @@ birth_gmms = GMM(
 )
 
 
-@jaxtyped(typechecker=typechecker)
-@eqx.filter_jit
-def sample_from_large_gmm(
-    means: Float[Array, "num_components state_dim"],
-    weights: Float[Array, "num_components"],
-    covs: Float[Array, "num_components state_dim state_dim"],
-    key: Key[Array, ""],
-    target_components: int = 2,
-) -> GMM:
-    # Normalize weights
-    probs = weights / jnp.sum(weights)
-
-    # Sample component indices
-    keys = jax.random.split(key, target_components)
-    indices = jax.vmap(lambda k: jax.random.choice(k, means.shape[0], p=probs))(keys)
-
-    # Sample from selected components
-    samples = jax.vmap(
-        lambda k, i: jax.random.multivariate_normal(k, means[i], covs[i])
-    )(keys, indices)
-
-    # Apply KDE
-    beta = ((4 / (means.shape[-1] + 2)) ** (2 / (means.shape[-1] + 4))) * (
-        target_components ** (-2 / (means.shape[-1] + 4))
-    )
-    kde_cov = beta * jnp.cov(samples.T)
-
-    return GMM(
-        samples,
-        jnp.tile(kde_cov, (target_components, 1, 1)),
-        jnp.full(target_components, jnp.sum(weights) / target_components),
-    )
-
-
 clutter_region = jnp.array([[0.0, 200.0], [0.0, 200.0], [0.0, 400.0]])
 clutter_average_rate = 10.0
 clutter_max_points = 40
@@ -99,91 +66,31 @@ measurement_system = Radar(R)
 stochastic_filter = EnGMPHD(debug=True)
 
 
-@jaxtyped(typechecker=typechecker)
-@eqx.filter_jit
-def union(rfs1: RFS, rfs2: RFS) -> RFS:
-    """
-    Union of two RFS objects by concatenating their state and mask arrays.
-
-    Args:
-        rfs1: First RFS
-        rfs2: Second RFS
-
-    Returns:
-        New RFS with combined states and masks
-    """
-    assert rfs1.state.shape[1] == rfs2.state.shape[1], "State dimensions must match"
-
-    combined_state = jnp.concatenate([rfs1.state, rfs2.state], axis=0)
-    combined_mask = jnp.concatenate([rfs1.mask, rfs2.mask], axis=0)
-
-    assert combined_state.shape[0] == rfs1.state.shape[0] + rfs2.state.shape[0]
-    assert combined_mask.shape[0] == rfs1.mask.shape[0] + rfs2.mask.shape[0]
-
-    return RFS(combined_state, combined_mask)
-
-
-@eqx.filter_jit
-@jaxtyped(typechecker=typechecker)
-def compute_ospa_cost_matrix(
-    estimates: Float[Array, "m 3"],
-    truth: Float[Array, "n 3"],
-    cutoff: float = 100.0,
-    p: int = 2,
-) -> Float[Array, "m n"]:
-    """Compute cost matrix for OSPA metric using Euclidean distance on positions."""
-
-    est_pos = estimates[:, :3]
-    truth_pos = truth[:, :3]
-
-    assert est_pos.shape[1] == 3
-    assert truth_pos.shape[1] == 3
-
-    # Compute pairwise distances
-    diff = est_pos[:, None, :] - truth_pos[None, :, :]  # Shape: (m, n, 3)
-    distances = jnp.linalg.norm(diff, axis=2)  # Shape: (m, n)
-
-    # Apply cutoff and power
-    costs = jnp.minimum(distances, cutoff) ** p
-
-    assert costs.shape == (estimates.shape[0], truth.shape[0])
-    return costs
 
 
 @jaxtyped(typechecker=typechecker)
-def compute_ospa_components(estimates, truth, cutoff=100.0, p=2):
-    m, n = estimates.shape[0], truth.shape[0]
-    max_card = jnp.maximum(m, n)
+def extract_phd_targets(
+    gmm: GMM, threshold: float = 0.5
+) -> Float[Array, "num_targets state_dim"]:
+    """Extract target states from PHD intensity."""
+    # Components with weight > threshold
+    valid_mask = gmm.weights > threshold
+    valid_means = gmm.means[valid_mask]
+    valid_weights = gmm.weights[valid_mask]
 
-    if m == 0 and n == 0:
-        return 0.0
+    # Number of targets ≈ sum of weights
+    n_targets = jnp.round(jnp.sum(gmm.weights)).astype(int)
 
-    if m == 0:
-        return cutoff
-
-    if n == 0:
-        return cutoff
-
-    cost_matrix = compute_ospa_cost_matrix(estimates, truth, cutoff, p)
-    row_indices, col_indices = optax.assignment.hungarian_algorithm(cost_matrix)
-    assignment_cost = cost_matrix[row_indices, col_indices].sum()
-    localization = (
-        (assignment_cost / jnp.minimum(m, n)) ** (1 / p)
-        if jnp.minimum(m, n) > 0
-        else 0.0
-    )
-    cardinality = cutoff * jnp.abs(m - n) / jnp.maximum(m, n)
-    total = ((assignment_cost + cutoff**p * jnp.abs(m - n)) / jnp.maximum(m, n)) ** (
-        1 / p
-    )
-    return total, localization, cardinality
+    # Simple extraction: top n_targets by weight
+    sorted_idx = jnp.argsort(valid_weights)[::-1]
+    return valid_means[sorted_idx[:n_targets]]
 
 
 ospa_distance = []
 ospa_localization = []
 ospa_cardinality = []
 
-for _ in range(30):
+for _ in range(100):
     print(_, end=": ")
     intensity_function: GMM = merge_gmms(intensity_function, birth_gmms, key)
     print(f"Total weight: {jnp.sum(intensity_function.weights):.3f}")
@@ -218,31 +125,18 @@ for _ in range(30):
         measurement_system,
     )
 
-    estimated_cardinality = jnp.sum(intensity_function.weights)
-    print(estimated_cardinality)
+    print(intensity_function)
+    estimates = extract_phd_targets(intensity_function)
+    finite_mask = estimates[:, 0] < jnp.inf
+    valid_estimates = estimates[finite_mask]
 
-    sorted_indices = jnp.argsort(intensity_function.weights)[
-        -int(estimated_cardinality) :
-    ]
-    estimated_states = intensity_function.means[sorted_indices]
-    # print(estimated_states)
+    distance, localization, cardinality = ospa_metric(
+        valid_estimates[:, :3], true_state[:, :3]
+    )
 
-    #     max_targets = 10  # compile-time constant
-
-    #     sorted_indices = jnp.argsort(estimated_weights)[-max_targets:]
-    #     final_estimates = estimated_states[sorted_indices]
-    #     final_weights = estimated_weights[sorted_indices]
-    #     valid_estimates_mask = final_weights > 1e-5
-
-    #     # ospa = compute_ospa_metric(
-    #     #     final_estimates[:, :3], true_state.state[:, 3], cutoff=100.0, p=2
-    #     # )
-    #     distance, localization, cardinality = compute_ospa_components(
-    #         final_estimates[:, :3], true_state.state[:, :3]
-    #     )
-    #     ospa_distance.append(distance)
-    #     ospa_localization.append(localization)
-    #     ospa_cardinality.append(cardinality)
+    ospa_distance.append(distance)
+    ospa_localization.append(localization)
+    ospa_cardinality.append(cardinality)
 
     key, subkey = jax.random.split(key)
     true_state = eqx.filter_vmap(system.flow)(0.0, 1.0, true_state)
@@ -254,9 +148,13 @@ for _ in range(30):
     )
 
 
-# plt.plot(ospa_distance)
-# plt.show()
-# plt.plot(ospa_localization)
-# plt.show()
-# plt.plot(ospa_cardinality)
-# plt.show()
+
+plt.title("Distance")
+plt.plot(ospa_distance)
+plt.show()
+plt.title("Localization")
+plt.plot(ospa_localization)
+plt.show()
+plt.title("Cardinality")
+plt.plot(ospa_cardinality)
+plt.show()

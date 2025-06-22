@@ -61,7 +61,7 @@ clutter_max_points = 40
 
 range_std = 1.0
 angle_std = 0.5 * jnp.pi / 180
-R = jnp.diag(jnp.array([range_std**2, angle_std**2, angle_std**2]))
+R = 0.0000001 * jnp.diag(jnp.array([range_std**2, angle_std**2, angle_std**2]))
 measurement_system = Radar(R)
 stochastic_filter = EnGMPHD(debug=True)
 
@@ -88,71 +88,72 @@ def extract_phd_targets(
 import jax.numpy as jnp
 
 
-# ospa_distance = []
-# ospa_localization = []
-# ospa_cardinality = []
-# cardinality = jnp.zeros((250, 100))
+ospa_distance = []
+ospa_localization = []
+ospa_cardinality = []
 
-# for mc_run in range(1):
-#     print(mc_run, ":")
-#     key, subkey = jax.random.split(key)
+mc_runs = 1
+cardinality = jnp.zeros((mc_runs, 100))
+for mc_run in range(mc_runs):
+    print(mc_run, ":")
+    key, subkey = jax.random.split(key)
     
-#     for time in range(100):
-#         print("\t", time, end=": ")
-#         intensity_function: GMM = merge_gmms(intensity_function, birth_gmms, key)
-#         print(f"Total weight: {jnp.sum(intensity_function.weights):.3f}")
+    for time in range(100):
+        print("\t", time, end=": ")
+        intensity_function: GMM = merge_gmms(intensity_function, birth_gmms, key)
+        print(f"Total weight: {jnp.sum(intensity_function.weights):.3f}")
 
-#         # SKIP GATING
-#         # Generate Clutter
-#         key, subkey = jax.random.split(key)
-#         clutter: RFS = poisson_point_process_rectangular_region(
-#             subkey,
-#             clutter_average_rate,
-#             clutter_region,
-#             clutter_max_points,
-#         )
-#         clutter = clutter.state[clutter.mask]
-#         all_measureables = jnp.concat([true_state[:, :3], clutter])
+        # SKIP GATING
+        # Generate Clutter
+        key, subkey = jax.random.split(key)
+        clutter: RFS = poisson_point_process_rectangular_region(
+            subkey,
+            clutter_average_rate,
+            clutter_region,
+            clutter_max_points,
+        )
+        clutter = clutter.state[clutter.mask]
+        all_measureables = jnp.concat([true_state[:, :3], clutter])
 
-#         # Generate Measurements based on all available information
-#         key, subkey = jax.random.split(key)
-#         measurements = eqx.filter_vmap(measurement_system)(
-#             all_measureables, jax.random.split(subkey, all_measureables.shape[0])
-#         )
-#         key, subkey = jax.random.split(key)
-#         detected = jax.random.bernoulli(subkey, p=0.98, shape=(measurements.shape[0],))
-#         measurements = measurements[detected]
+        # Generate Measurements based on all available information
+        key, subkey = jax.random.split(key)
+        measurements = eqx.filter_vmap(measurement_system)(
+            all_measureables, jax.random.split(subkey, all_measureables.shape[0])
+        )
+        key, subkey = jax.random.split(key)
+        detected = jax.random.bernoulli(subkey, p=0.98, shape=(measurements.shape[0],))
+        measurements = measurements[detected]
 
-#         # EnGMF Update Equations
-#         key, subkey = jax.random.split(key)
-#         intensity_function = stochastic_filter.update(
-#             subkey,
-#             intensity_function,
-#             measurements,
-#             measurement_system,
-#         )
-#         cardinality = cardinality.at[mc_run, time].set(jnp.floor(jnp.sum(intensity_function.weights)))
+        # EnGMF Update Equations
+        key, subkey = jax.random.split(key)
+        intensity_function = stochastic_filter.update(
+            subkey,
+            intensity_function,
+            measurements,
+            measurement_system,
+        )
+        cardinality = cardinality.at[mc_run, time].set(jnp.floor(jnp.sum(intensity_function.weights)))
 
-#         # estimates = extract_phd_states(intensity_function)
-#         # finite_mask = estimates[:, 0] < jnp.inf
-#         # valid_estimates = estimates[finite_mask]
+        estimates = extract_phd_targets(intensity_function)
+        finite_mask = estimates[:, 0] < jnp.inf
+        valid_estimates = estimates[finite_mask]
 
-#         # distance, localization, cardinality = ospa_metric(
-#         #     valid_estimates[:, :3], true_state[:, :3]
-#         # )
+        distance, localization, ospa_cardinality_this_time = ospa_metric(
+            valid_estimates[:, :3], true_state[:, :3]
+        )
 
-#         # ospa_distance.append(distance)
-#         # ospa_localization.append(localization)
-#         # ospa_cardinality.append(cardinality)
+        ospa_distance.append(distance)
+        ospa_localization.append(localization)
+        ospa_cardinality.append(ospa_cardinality_this_time)
 
-#         key, subkey = jax.random.split(key)
-#         true_state = eqx.filter_vmap(system.flow)(0.0, 1.0, true_state)
+        key, subkey = jax.random.split(key)
+        true_state = eqx.filter_vmap(system.flow)(0.0, 1.0, true_state)
 
-#         intensity_function = GMM(
-#             means=eqx.filter_vmap(system.flow)(0.0, 1.0, intensity_function.means),
-#             covs=intensity_function.covs,
-#             weights=0.99 * intensity_function.weights,
-#         )
+        intensity_function = GMM(
+            means=eqx.filter_vmap(system.flow)(0.0, 1.0, intensity_function.means),
+            covs=intensity_function.covs,
+            weights=0.99 * intensity_function.weights,
+        )
 
 if cardinality is not []:
     time_range = jnp.arange(100)

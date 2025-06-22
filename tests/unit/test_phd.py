@@ -21,27 +21,29 @@ from data_science_utils.statistics import (
 )
 from data_science_utils.statistics.random_finite_sets import RFS
 from data_science_utils.filters.evaluate import ospa_metric
+from data_science_utils.models.kmeans import kmeans
 
 key = jax.random.key(42)
 key, subkey = jax.random.split(key)
 
-
+### Constant Velocity Model - VERIFIED
 system = CVModel(
-    position_dimension=3, sampling_period=1.0, process_noise_std=5.0, ordering="durant"
+    position_dimension=3, sampling_period=1.0, ordering="durant"
 )
 true_state = jnp.array(
     [[50, 50, 50, 0.5, 0.5, 2], [100, 100, 50, -0.5, -0.5, 2]], dtype=jnp.float64
 )
 
-eqx.filter_vmap(system.flow)(0.0, 1.0, true_state)
-
+### Initial Intensity Function 
 intensity_function = GMM(
     means=jnp.zeros((250, 6)),
-    covs=jnp.tile(jnp.eye(6), (250, 1, 1)),
+    covs=jnp.zeros((250, 6, 6)).at[0].set(jnp.eye(6)),
     weights=jnp.zeros(250).at[0].set(1e-16),
     max_components=250,
 )
 
+
+### Birth Process
 birth_means = jnp.array([75, 75, 150, 0, 0, 0], dtype=jnp.float64)
 birth_covs = jnp.diag(jnp.array([50, 50, 50, 5, 5, 5]) ** 2)
 birth_weights = jnp.array(1 / 100)
@@ -54,27 +56,30 @@ birth_gmms = GMM(
 )
 
 
+### Clutter Generation
 clutter_region = jnp.array([[0.0, 200.0], [0.0, 200.0], [0.0, 400.0]])
 clutter_average_rate = 10.0
-clutter_max_points = 40
+clutter_max_points = 100
 
-
+### Measurement System
 range_std = 1.0
 angle_std = 0.5 * jnp.pi / 180
 R = jnp.diag(jnp.array([range_std**2, angle_std**2, angle_std**2]))
 measurement_system = Radar(R)
 
+
+### Filtering System
 stochastic_filter = EnGMPHD(debug=True)
 
 
-
-from data_science_utils.models.kmeans import kmeans
-
-
+### State Extraction
 def state_extraction_from_gmm(key, gmm: GMM):
-    points = intensity_function.means
-    estimated_cardinality = int(jnp.ceil(jnp.sum(intensity_function.weights)))
-    return kmeans(key, points, estimated_cardinality).centroids
+    if jnp.sum(intensity_function.weights) > 0.5:
+        points = intensity_function.means
+        estimated_cardinality = int(jnp.ceil(jnp.sum(intensity_function.weights)))
+        return kmeans(key, points, estimated_cardinality).centroids
+    else:
+        return jnp.zeros((0, gmm.means.shape[1]))
 
 
 ospa_distances = []
@@ -92,16 +97,17 @@ for mc_run in range(mc_runs):
         intensity_function: GMM = merge_gmms(intensity_function, birth_gmms, key)
         print(f"Total weight: {jnp.sum(intensity_function.weights):.3f}")
 
-        # SKIP GATING
+
         # Generate Clutter
         key, subkey = jax.random.split(key)
-        clutter: RFS = poisson_point_process_rectangular_region(
-            subkey,
-            clutter_average_rate,
-            clutter_region,
-            clutter_max_points,
+        n_points = jax.random.poisson(subkey, lam=clutter_average_rate)
+        key, subkey = jax.random.split(key)
+        uniform_samples = jax.random.uniform(
+            subkey, shape=(n_points, 3), minval=0.0, maxval=1.0
         )
-        clutter = clutter.state[clutter.mask]
+        widths = clutter_region[:, 1] - clutter_region[:, 0]
+        clutter = clutter_region[:, 0] + uniform_samples * widths[None, :]
+        
         all_measureables = jnp.concat([true_state[:, :3], clutter])
 
         # Generate Measurements based on all available information
@@ -124,6 +130,7 @@ for mc_run in range(mc_runs):
         cardinality = cardinality.at[mc_run, time].set(jnp.floor(jnp.sum(intensity_function.weights)))
         
         key, subkey = jax.random.split(key)
+        
         estimates = state_extraction_from_gmm(subkey, intensity_function)
         
         print(f"{estimates=}")

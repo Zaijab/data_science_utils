@@ -63,7 +63,6 @@ def poisson_point_process_rectangular_region(
     # Compute hypervolume
     widths = bounds[:, 1] - bounds[:, 0]
     hypervolume = jnp.prod(widths)
-
     # Step 1: Sample number of points
     count_key, points_key = jax.random.split(key)
     n_points = jax.random.poisson(count_key, lam=intensity)

@@ -131,7 +131,7 @@ class EnGMPHD(eqx.Module, strict=True):
         j_indices = jnp.arange(state_dim)[None, :]
         distances = jnp.abs(i_indices - j_indices)
 
-        L = 3.0  # or 4.0
+        L = 4.0  # or 4.0
         rho = jnp.exp(-(distances**2) / (2 * L**2))
 
         emperical_covariance = emperical_covariance * rho

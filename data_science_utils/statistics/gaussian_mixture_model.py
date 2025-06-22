@@ -102,7 +102,7 @@ def merge_gmms(
     uniform_weights = jnp.full(
         target_components, jnp.array([W1 + W2]) / target_components
     )
-    spatial_dimension = gmm_1.means.shape[1]
+    spatial_dimension = gmm1.means.shape[1]
     silverman_beta = (
         ((4) / (spatial_dimension + 2)) ** (2 / (spatial_dimension + 4))
     ) * ((target_components) ** (-(2) / (spatial_dimension + 4)))

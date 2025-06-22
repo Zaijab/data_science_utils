@@ -125,7 +125,10 @@ for _ in range(100):
         measurement_system,
     )
 
-    print(intensity_function)
+    print(jnp.sum(intensity_function.weights))
+
+    break
+
     estimates = extract_phd_targets(intensity_function)
     finite_mask = estimates[:, 0] < jnp.inf
     valid_estimates = estimates[finite_mask]
@@ -149,12 +152,13 @@ for _ in range(100):
 
 
 
-plt.title("Distance")
-plt.plot(ospa_distance)
-plt.show()
-plt.title("Localization")
-plt.plot(ospa_localization)
-plt.show()
-plt.title("Cardinality")
-plt.plot(ospa_cardinality)
-plt.show()
+if ospa_distance is not []:
+    plt.title("Distance")
+    plt.plot(ospa_distance)
+    plt.show()
+    plt.title("Localization")
+    plt.plot(ospa_localization)
+    plt.show()
+    plt.title("Cardinality")
+    plt.plot(ospa_cardinality)
+    plt.show()

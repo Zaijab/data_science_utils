@@ -22,9 +22,11 @@ in https://colab.research.google.com/drive/1AwS4haUx6swF82w3nXr6QKhajdF8aSvA#scr
 This implementation is used without permission from CR.
 """
 
+from functools import partial
 from typing import NamedTuple
 
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 from jax import jit, lax, random, vmap
 from jax.numpy.linalg import norm
@@ -152,6 +154,7 @@ def kmeans_with_seed(key, points, k, thresh=1e-5, max_iters=100):
         for convergence. 
     """
     # number of points
+    print(k)
     n = points.shape[0]
 
     def init():
@@ -192,9 +195,10 @@ def kmeans_with_seed(key, points, k, thresh=1e-5, max_iters=100):
 
 
 kmeans_with_seed_jit = jit(kmeans_with_seed, static_argnums=(2,3))
+kmeans_with_seed_jit = eqx.filter_jit(kmeans_with_seed)
 
 
-@eqx.filter_jit
+@partial(jax.jit, static_argnums=(2,3,4,5))
 def kmeans(key, points, k, iter=20, thresh=1e-5, max_iters=100):
     r"""Clusters points using k-means algorithm
 
@@ -243,7 +247,3 @@ def kmeans(key, points, k, iter=20, thresh=1e-5, max_iters=100):
     return KMeansSolution(centroids=results.centroids[i], assignment=results.assignment[i], 
         distortion=results.distortion[i], key=keys[i],
         iterations=results.iterations[i])
-
-
-import jax
-

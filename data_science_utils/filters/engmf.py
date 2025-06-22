@@ -58,7 +58,7 @@ class EnGMF(AbstractFilter, strict=True):
             # jax.debug.callback(is_positive_definite, gaussian_mixture_covariance)
             jax.debug.callback(has_nan, gaussian_mixture_covariance)
 
-        point = point - (
+        posterior_point = point - (
             kalman_gain @ jnp.atleast_2d(measurement_device(point) - measurement)
         ).reshape(-1)
         if self.debug:
@@ -73,7 +73,7 @@ class EnGMF(AbstractFilter, strict=True):
         if self.debug:
             assert isinstance(logposterior_weights, Float[Array, ""])
 
-        return point, logposterior_weights, gaussian_mixture_covariance
+        return posterior_point, logposterior_weights, gaussian_mixture_covariance
 
     @jaxtyped(typechecker=typechecker)
     @eqx.filter_jit

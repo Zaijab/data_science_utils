@@ -50,8 +50,7 @@ class EnGMPHD(eqx.Module, strict=True):
             measurement_jacobian @ prior_mixture_covariance @ measurement_jacobian.T
             + measurement_system.covariance
         )
-        
-        # innovation_cov = (innovation_cov + innovation_cov.T) / 2  # Symmetrize
+        innovation_cov = (innovation_cov + innovation_cov.T) / 2  # Symmetrize
         if self.debug:
             assert isinstance(innovation_cov, Float[Array, "measurement_dim measurement_dim"])
 
@@ -115,7 +114,7 @@ class EnGMPHD(eqx.Module, strict=True):
         prior_covs = prior_gmm.covs
         prior_weights = prior_gmm.weights
 
-        estimated_cardinality = jnp.ceil(jnp.sum(prior_weights))
+        estimated_cardinality = (jnp.sum(prior_weights))
         silverman_bandwidth = ((4) / (prior_ensemble.shape[0] * (prior_ensemble.shape[-1] + 2))) ** ((2) / (prior_ensemble.shape[-1] + 4))
         emperical_covariance = jnp.cov(prior_ensemble.T)
 

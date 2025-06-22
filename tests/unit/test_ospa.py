@@ -101,3 +101,67 @@ def test_ospa_metric_extended():
         and jnp.allclose(loc, expected_loc)
         and jnp.allclose(card, expected_card)
     )
+
+
+import jax.numpy as jnp
+import optax
+from jaxtyping import Array, Float
+from beartype import beartype as typechecker
+from jaxtyping import jaxtyped
+import equinox as eqx
+
+@eqx.filter_jit
+# @jaxtyped(typechecker=typechecker)
+def ospa_metric(
+    X: Float[Array, "m pos_dim"],
+    Y: Float[Array, "n pos_dim"], 
+    c: float = 100.0,
+    p: float = 2.0,
+) -> tuple[float, float, float]:
+    m, n = X.shape[0], Y.shape[0]
+    
+    # Distance matrix: D[i,j] = ||x_i - y_j||
+    D = jnp.sqrt(jnp.sum((X[:, None, :] - Y[None, :, :]) ** 2, axis=2))
+    D_cut = jnp.minimum(D, c)
+    C = D_cut ** p
+    
+    # Hungarian assignment
+    row_ind, col_ind = optax.assignment.hungarian_algorithm(C)
+    assignment_cost = C[row_ind, col_ind].sum()
+    
+    # Metrics
+    e_loc = (assignment_cost / jnp.minimum(m, n)) ** (1/p)
+    e_card = c * jnp.abs(m - n) / jnp.maximum(m, n)
+    ospa = ((assignment_cost + c**p * jnp.abs(m - n)) / jnp.maximum(m, n)) ** (1/p)
+    
+    return ospa, e_loc, e_card
+
+# Data (position coordinates only)
+estimates = jnp.array([
+    [46.39, 49.98, 247.72],
+    [99.75, 98.70, 251.49], 
+    [148.95, 120.08, 231.61],
+    [115.92, 40.28, 304.90],
+    [78.49, 134.15, 153.34]
+])
+
+true_state = jnp.array([
+    [99.5, 99.5, 248.0],
+    [50.5, 50.5, 248.0]
+])
+
+#
+#
+# OSPA Distance: 77.498546
+# OSPA Localization: 3.880947
+# OSPA Cardinality: 60.000000
+
+
+assert estimates.shape[1] == 3, f"Expected 3D positions, got {estimates.shape[1]}"
+assert true_state.shape[1] == 3, f"Expected 3D positions, got {true_state.shape[1]}"
+
+ospa_distance, ospa_localization, ospa_cardinality = ospa_metric(estimates, true_state)
+
+print(f"OSPA Distance: {ospa_distance:.6f}")
+print(f"OSPA Localization: {ospa_localization:.6f}") 
+print(f"OSPA Cardinality: {ospa_cardinality:.6f}")

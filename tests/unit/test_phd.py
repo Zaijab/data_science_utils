@@ -22,7 +22,7 @@ from data_science_utils.statistics import (
 from data_science_utils.statistics.random_finite_sets import RFS
 from data_science_utils.filters.evaluate import ospa_metric
 
-key = jax.random.key(0)
+key = jax.random.key(42)
 key, subkey = jax.random.split(key)
 
 
@@ -61,36 +61,25 @@ clutter_max_points = 40
 
 range_std = 1.0
 angle_std = 0.5 * jnp.pi / 180
-R = 0.0000001 * jnp.diag(jnp.array([range_std**2, angle_std**2, angle_std**2]))
+R = jnp.diag(jnp.array([range_std**2, angle_std**2, angle_std**2]))
 measurement_system = Radar(R)
+
 stochastic_filter = EnGMPHD(debug=True)
 
 
 
-
-@jaxtyped(typechecker=typechecker)
-def extract_phd_targets(
-    gmm: GMM, threshold: float = 0.5
-) -> Float[Array, "num_targets state_dim"]:
-    """Extract target states from PHD intensity."""
-    # Components with weight > threshold
-    valid_mask = gmm.weights > threshold
-    valid_means = gmm.means[valid_mask]
-    valid_weights = gmm.weights[valid_mask]
-
-    # Number of targets ≈ sum of weights
-    n_targets = jnp.round(jnp.sum(gmm.weights)).astype(int)
-
-    # Simple extraction: top n_targets by weight
-    sorted_idx = jnp.argsort(valid_weights)[::-1]
-    return valid_means[sorted_idx[:n_targets]]
-
-import jax.numpy as jnp
+from data_science_utils.models.kmeans import kmeans
 
 
-ospa_distance = []
-ospa_localization = []
-ospa_cardinality = []
+def state_extraction_from_gmm(key, gmm: GMM):
+    points = intensity_function.means
+    estimated_cardinality = int(jnp.ceil(jnp.sum(intensity_function.weights)))
+    return kmeans(key, points, estimated_cardinality).centroids
+
+
+ospa_distances = []
+ospa_localizations = []
+ospa_cardinalities = []
 
 mc_runs = 1
 cardinality = jnp.zeros((mc_runs, 100))
@@ -133,18 +122,26 @@ for mc_run in range(mc_runs):
             measurement_system,
         )
         cardinality = cardinality.at[mc_run, time].set(jnp.floor(jnp.sum(intensity_function.weights)))
-
-        estimates = extract_phd_targets(intensity_function)
-        finite_mask = estimates[:, 0] < jnp.inf
-        valid_estimates = estimates[finite_mask]
-
-        distance, localization, ospa_cardinality_this_time = ospa_metric(
-            valid_estimates[:, :3], true_state[:, :3]
+        
+        key, subkey = jax.random.split(key)
+        estimates = state_extraction_from_gmm(subkey, intensity_function)
+        
+        print(f"{estimates=}")
+        print(f"{true_state=}")
+        
+        ospa_distance, ospa_localization, ospa_cardinality = ospa_metric(
+            estimates[:, :3], true_state[:, :3]
         )
+        print(ospa_distance)
+        print(f"OSPA Distance: {ospa_distance:.6f}")
+        print(f"OSPA Localization: {ospa_localization:.6f}") 
+        print(f"OSPA Cardinality: {ospa_cardinality:.6f}")
 
-        ospa_distance.append(distance)
-        ospa_localization.append(localization)
-        ospa_cardinality.append(ospa_cardinality_this_time)
+
+        print("\t", ospa_distance)
+        ospa_distances.append(ospa_distance)
+        ospa_localizations.append(ospa_localization)
+        ospa_cardinalities.append(ospa_cardinality)
 
         key, subkey = jax.random.split(key)
         true_state = eqx.filter_vmap(system.flow)(0.0, 1.0, true_state)
@@ -155,19 +152,19 @@ for mc_run in range(mc_runs):
             weights=0.99 * intensity_function.weights,
         )
 
-if cardinality is not []:
-    time_range = jnp.arange(100)
-    for mc_run in range(cardinality.shape[0]):
-        plt.plot(time_range, cardinality[mc_run])
-    plt.show()
+# if cardinality is not []:
+#     time_range = jnp.arange(100)
+#     for mc_run in range(cardinality.shape[0]):
+#         plt.plot(time_range, cardinality[mc_run])
+#     plt.show()
 
 if ospa_distance is not []:
     plt.title("Distance")
-    plt.plot(ospa_distance)
+    plt.plot(ospa_distances)
     plt.show()
     plt.title("Localization")
-    plt.plot(ospa_localization)
+    plt.plot(ospa_localizations)
     plt.show()
     plt.title("Cardinality")
-    plt.plot(ospa_cardinality)
+    plt.plot(ospa_cardinalities)
     plt.show()

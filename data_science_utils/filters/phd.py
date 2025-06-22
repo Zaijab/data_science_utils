@@ -179,8 +179,7 @@ class EnGMPHD(eqx.Module, strict=True):
         )
 
 
-        ### v(x_k | Z_k) = (1 - p_d) * v(x_k) + \sum_{z \in Z_k} \sum_{i = 1}^{J_k}
-        
+        ### v(x_k | Z_k) = (1 - p_d) * v(x_k) + \sum_{z \in Z_k} \sum_{i = 1}^{J_k}        
         intensity_function = GMM(
             jnp.concatenate([missed_gmm.means, detection_gmm.means]),
             jnp.concatenate([missed_gmm.covs, detection_gmm.covs]),

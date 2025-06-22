@@ -38,7 +38,7 @@ eqx.filter_vmap(system.flow)(0.0, 1.0, true_state)
 intensity_function = GMM(
     means=jnp.zeros((250, 6)),
     covs=jnp.tile(jnp.eye(6), (250, 1, 1)),
-    weights=jnp.tile(1e-16, (250)),
+    weights=jnp.zeros(250).at[0].set(1e-16),
     max_components=250,
 )
 

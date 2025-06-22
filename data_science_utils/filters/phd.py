@@ -35,7 +35,7 @@ class EnGMPHD(eqx.Module, strict=True):
         measurement_system: AbstractMeasurementSystem, # h
     ):
         ### (eq. 21)
-        # H_{k}^(i) = del h / del x (x_{k|k-1}^(i))
+        # H_{k}^{(i)} = \frac{\partial h}{\partial x} (x_{k|k-1}^(i))
         measurement_jacobian = jax.jacfwd(measurement_system)(point)
 
         if self.debug:

@@ -154,7 +154,6 @@ def kmeans_with_seed(key, points, k, thresh=1e-5, max_iters=100):
         for convergence. 
     """
     # number of points
-    print(k)
     n = points.shape[0]
 
     def init():

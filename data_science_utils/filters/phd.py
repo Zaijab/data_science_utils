@@ -109,39 +109,40 @@ class EnGMPHD(eqx.Module, strict=True):
         measurements: Float[Array, "num_measurements measurement_dim"],
         measurement_system: AbstractMeasurementSystem,
     ):
-
         prior_ensemble = prior_gmm.means
         prior_covs = prior_gmm.covs
         prior_weights = prior_gmm.weights
 
-        estimated_cardinality = (jnp.sum(prior_weights))
-        silverman_bandwidth = ((4) / (prior_ensemble.shape[0] * (prior_ensemble.shape[-1] + 2))) ** ((2) / (prior_ensemble.shape[-1] + 4))
-        emperical_covariance = jnp.cov(prior_ensemble.T)
-
         if self.debug:
             assert isinstance(prior_gmm.means, Float[Array, "num_components state_dim"])
-            assert isinstance(
-                prior_gmm.covs, Float[Array, "num_components state_dim state_dim"]
-            )
+            assert isinstance(prior_gmm.covs, Float[Array, "num_components state_dim state_dim"])
             assert isinstance(prior_gmm.weights, Float[Array, "num_components"])
 
-        # Localization
-        state_dim = emperical_covariance.shape[0]
-        i_indices = jnp.arange(state_dim)[:, None]
-        j_indices = jnp.arange(state_dim)[None, :]
-        distances = jnp.abs(i_indices - j_indices)
-
-        L = 4.0  # or 4.0
-        rho = jnp.exp(-(distances**2) / (2 * L**2))
-
-        emperical_covariance = emperical_covariance * rho
-
+        ### Silverman Covariance Estimate
+        estimated_cardinality = jnp.ceil(jnp.sum(prior_weights))
+        silverman_bandwidth = ((4) / (prior_ensemble.shape[0] * (prior_ensemble.shape[-1] + 2))) ** ((2) / (prior_ensemble.shape[-1] + 4))
+        emperical_covariance = jnp.cov(prior_ensemble.T)
         mixture_covariance = (silverman_bandwidth / estimated_cardinality) * emperical_covariance
 
         if self.debug:
             assert isinstance(emperical_covariance, Float[Array, "state_dim state_dim"])
             assert isinstance(mixture_covariance, Float[Array, "state_dim state_dim"])
 
+        ### Localization
+        state_dim = emperical_covariance.shape[0]
+        i_indices = jnp.arange(state_dim)[:, None]
+        j_indices = jnp.arange(state_dim)[None, :]
+        distances = jnp.abs(i_indices - j_indices)
+        L = 3.0
+        rho = jnp.exp(-(distances**2) / (2 * L**2))
+        mixture_covariance = rho * mixture_covariance
+
+        if self.debug:
+            assert isinstance(mixture_covariance, Float[Array, "state_dim state_dim"])
+
+
+
+        ### EnKF Update Per Measurement
         def process_measurement(measurement):
             return jax.vmap(self.update_point, in_axes=(0, None, None, None))(
                 prior_gmm.means,
@@ -150,18 +151,24 @@ class EnGMPHD(eqx.Module, strict=True):
                 measurement_system,
             )
 
-        ### \hat{x}_{k | k}^{(i)}, \hat{P}_{k | k}^{(i)}, log(\xi_{k}^{(i)})
+        # \hat{x}_{k | k}^{(i)}, \hat{P}_{k | k}^{(i)}, log(\xi_{k}^{(i)})
         posterior_ensemble, posterior_covariances, logposterior_weights = jax.vmap(
             process_measurement
         )(measurements)
+        
 
 
         ### Log Sum Exp for w_{k | k}^{(i)}
-        log_numerator = (jnp.log(self.detection_probability) + jnp.log(prior_weights)[None, :] + 
-                        logposterior_weights)
+        log_numerator = (jnp.log(self.detection_probability) + jnp.log(prior_weights)[None, :] + logposterior_weights)
         log_sum_detection = jax.scipy.special.logsumexp(log_numerator, axis=1)
         log_denominator = jnp.log(self.lambda_c * self.clutter_density + jnp.exp(log_sum_detection))
         posterior_weights = jnp.exp(log_numerator - log_denominator[:, None])
+
+        if self.debug:
+            assert isinstance(log_numerator, Float[Array, "num_measurements num_components"])
+            assert isinstance(log_sum_detection, Float[Array, "num_measurements"])
+            assert isinstance(log_denominator, Float[Array, "num_measurements"])
+            assert isinstance(posterior_weights, Float[Array, "num_measurements num_components"])
 
         ### GMM: \sum_{z \in Z_k} \sum_{i = 1}^{J_k} w_{k | k}^{(i)} N( \cdot ; \hat{x}_{k | k}^{(i)}, \hat{P}_{k | k}^{(i)})
         detection_gmm = GMM(
@@ -176,7 +183,6 @@ class EnGMPHD(eqx.Module, strict=True):
             prior_gmm.covs,
             (1 - self.detection_probability) * prior_gmm.weights
         )
-
 
         ### v(x_k | Z_k) = (1 - p_d) * v(x_k) + \sum_{z \in Z_k} \sum_{i = 1}^{J_k}        
         intensity_function = GMM(

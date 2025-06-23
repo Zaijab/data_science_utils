@@ -12,7 +12,7 @@ class CVModel(AbstractDiscreteDynamicalSystem, strict=True):
     """
     Constant Velocity motion model.
     Describes a dynamical system in which a particle (x, v_x) updates according to:
-    (x, v_x) -> (x + v_x * dt)
+    (x, v_x) -> (x + v_x * dt, v_x)
     (x, v_x, y, v_y) -> (x + v_x * dt, y + v_y * dt)
     """
 

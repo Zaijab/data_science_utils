@@ -21,7 +21,7 @@ class EnGMPHD(eqx.Module, strict=True):
     """
 
     debug: bool = False
-    clutter_density: float = 6.25e-9
+    clutter_density: float = 6.25e-8
     lambda_c: float = 10.0
     detection_probability: float = 0.98
 

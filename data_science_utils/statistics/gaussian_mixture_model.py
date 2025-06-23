@@ -118,9 +118,7 @@ def merge_gmms(
 def merge_gmms(
     gmm1: GMM, gmm2: GMM, key: Key[Array, ""], target_components: int = 250
 ) -> GMM:
-    target_components = min(
-        target_components, gmm1.weights.shape[0] + gmm2.weights.shape[0]
-    )
+
     # Compute total weights
     W1 = jnp.sum(gmm1.weights)
     W2 = jnp.sum(gmm2.weights)

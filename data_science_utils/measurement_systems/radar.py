@@ -15,14 +15,16 @@ class Radar(AbstractMeasurementSystem, strict=True):
     """
 
     covariance: Float[Array, "3"] = eqx.field(
-        default_factory=jnp.array([1.0, jnp.deg2rad(0.5), jnp.deg2rad(0.5)])
+        default_factory=lambda: jnp.diag(jnp.array([(1.0) ** 2,
+                                                    (0.5 * jnp.pi / 180) ** 2,
+                                                    (0.5 * jnp.pi / 180) ** 2]))
     )
 
     @jaxtyped(typechecker=typechecker)
     @eqx.filter_jit
     def __call__(
         self,
-        positions: Float[Array, "3"] | Float[Array, "6"],
+        positions: Float[Array, "state_dim"],
         key: Key[Array, ""] | None = None,
     ) -> Float[Array, "3"]:
         x, y, z = positions[0], positions[1], positions[2]
@@ -37,7 +39,6 @@ class Radar(AbstractMeasurementSystem, strict=True):
             )
 
         return measurements
-
 
 class RadarRFS(AbstractMeasurementSystem, strict=True):
     covariance: Float[Array, "..."]

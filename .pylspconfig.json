@@ -3,13 +3,13 @@
     "configurationSources": ["flake8"],
     "plugins": {
       "pycodestyle": {
-        "enabled": false
+        "enabled": true
       },
       "pyflakes": {
-        "enabled": false
+        "enabled": true
       },
       "flake8": {
-        "enabled": false
+        "enabled": true
       }
     }
   }

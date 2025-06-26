@@ -1031,6 +1031,7 @@ need to use the older and less efficient @code{pkg_resources} package.")
 		     python
 		     jupyter
 		     python-ott-jax
+		     python-pyflakes
 		     python-numpy
 		     python-pandas
 		     python-matplotlib

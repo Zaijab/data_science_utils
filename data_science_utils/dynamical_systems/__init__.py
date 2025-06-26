@@ -29,8 +29,8 @@ from data_science_utils.dynamical_systems.random_walk import (
 
 from data_science_utils.dynamical_systems.constant_velocity import (
     CVModel as CVModel,
-    # StochasticCVModel
-    # SwarmCVModel
-    # StochasticSwarmCVModel
-    # RFSCVModel
+)
+
+from data_science_utils.dynamical_systems.crtbp import (
+    CR3BP as CR3BP,
 )

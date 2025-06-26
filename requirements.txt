@@ -66,8 +66,8 @@ dm-tree==0.1.8
 dnspython==2.7.0
 docker==5.0.3
 docker-pycreds==0.4.0
-docstring-to-markdown==0.15
 docstring_parser==0.15
+docstring-to-markdown==0.15
 docutils==0.19
 doit==0.36.0
 dotmap==1.3.30
@@ -79,7 +79,7 @@ equinox==0.11.10
 et-xmlfile==1.1.0
 etils==1.5.2
 evosax==0.1.6
-exceptiongroup @ file:///tmp/guix-build-python-exceptiongroup-1.1.1.drv-0/source/dist/exceptiongroup-1.1.1-py3-none-any.whl#sha256=4ff65e7870a8b2c31f50b29c95f25da052816c8d864230835b1827aab61347f0
+exceptiongroup==1.1.1
 executing==2.1.0
 fastapi==0.115.6
 fastapi-cli==0.0.7
@@ -119,7 +119,7 @@ idna==3.3
 imagesize==1.4.1
 immutabledict==4.2.0
 immutables==0.21
-importlib-metadata @ file:///tmp/guix-build-python-importlib-metadata-5.2.0.drv-0/importlib_metadata-5.2.0/dist/importlib_metadata-5.2.0-py3-none-any.whl#sha256=5e6becace39c77c951fa752877af225aed1f232b32c5c15a2cada72202d65588
+importlib-metadata==5.2.0
 importlib-resources==5.12.0
 iniconfig==0.0.0
 invoke==2.2.0
@@ -152,10 +152,10 @@ jsonschema-path==0.3.2
 jsonschema-specifications==2024.10.1
 junit-xml==1.9
 jupyter==1.0.0
-jupyter-console==6.4.0
-jupyter-events==0.10.0
 jupyter_client==7.4.4
+jupyter-console==6.4.0
 jupyter_core==5.7.2
+jupyter-events==0.10.0
 jupyter_server==2.14.0
 jupyter_server_terminals==0.5.3
 jupyterlab-pygments==0.1.2
@@ -231,6 +231,7 @@ patsy==1.0.1
 pbr==5.5.1
 pexpect==4.9.0
 pillow==11.1.0
+pip==23.1
 platformdirs==4.3.6
 plotly==5.20.0
 pluggy==1.5.0
@@ -252,8 +253,8 @@ pyasn1-modules==0.2.8
 pycodestyle==2.12.1
 pycparser==2.21
 pydantic==1.10.19
-pydantic-settings==2.7.1
 pydantic_core==2.27.2
+pydantic-settings==2.7.1
 pydata-sphinx-theme==0.7.2
 pydevd==3.2.3
 pydevtool==0.3.0
@@ -307,6 +308,7 @@ scipy==1.12.0
 seaborn==0.13.1
 Send2Trash==1.8.2
 service-identity==24.2.0
+setuptools==65.5.0
 simple-parsing==0.1.4
 six==1.16.0
 smmap==3.0.1
@@ -373,6 +375,7 @@ websocket-client==1.8.0
 websockets==13.1
 Werkzeug==3.1.3
 whatthepatch==1.0.5
+wheel==0.40.0
 widgetsnbextension==4.0.10
 wrapt==1.17.0
 xdot==1.4

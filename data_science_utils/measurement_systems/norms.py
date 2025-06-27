@@ -46,6 +46,6 @@ class RangeSensor(AbstractMeasurementSystem):
     def __call__(
         self, state: Float[Array, "state_dim"], key: Key[Array, ""] | None = None
     ) -> Float[Array, "1"]:
-        perfect_measurement = jnp.linalg.norm(state)
+        perfect_measurement = jnp.linalg.norm(state[:3])
         noise = 0 if key is None else jnp.sqrt(self.covariance) * jax.random.normal(key)
         return (perfect_measurement + noise).reshape(-1)

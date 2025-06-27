@@ -33,7 +33,7 @@ def filter_update(
     Float[Array, "state_dim"],
 ]:
     (prior_ensemble, true_state, fuel) = carry
-    ensemble_updating_key, measurement_key, maneuver_key = jax.random.split(key, 3)
+    ensemble_updating_key, measurement_key, to_maneuver_key, maneuver_key = jax.random.split(key, 4)
     # p(y|GMM) = Σ_i w_i * N(y; H*μ_i, H*Σ_i*H^T + R)
     # measurement_probability_wrt_gmm = 10
     # jax.debug.print()
@@ -49,7 +49,22 @@ def filter_update(
         jax.debug.callback(plot_update, prior_ensemble, updated_ensemble, true_state)
     ensemble_next = eqx.filter_vmap(dynamical_system.flow)(0.0, 1.0, updated_ensemble)
     true_state_next = dynamical_system.flow(0.0, 1.0, true_state)
-    true_state_next, fuel = maneuver_normal_with_fuel(true_state_next, fuel, maneuver_key)
+
+    def apply_maneuver(true_state_next, fuel, maneuver_key):
+        return_value = maneuver_normal_with_fuel(true_state_next, fuel, maneuver_key)
+        # jax.debug.print("I moved {} {}", fuel, return_value[1])
+        return return_value
+
+    def no_maneuver(true_state_next, fuel, maneuver_key):
+        # jax.debug.print("I didn't move. {}", fuel)
+        return true_state_next, fuel
+
+    true_state_next, fuel = jax.lax.cond(
+        jax.random.bernoulli(to_maneuver_key),
+        apply_maneuver,
+        no_maneuver,
+        true_state_next, fuel, maneuver_key
+    )
     new_carry = (ensemble_next, true_state_next, fuel)
     return new_carry, error
 

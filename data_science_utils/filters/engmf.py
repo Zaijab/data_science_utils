@@ -19,62 +19,6 @@ class EnGMF(AbstractFilter, strict=True):
     debug: bool = False
     sampling_function: callable = jax.tree_util.Partial(sample_gaussian_mixture)
 
-    # @jaxtyped(typechecker=typechecker)
-    # @eqx.filter_jit
-    # def update_point(
-    #     self,
-    #     point: Float[Array, "state_dim"],
-    #     prior_mixture_covariance: Float[Array, "state_dim state_dim"],
-    #     measurement: Float[Array, "measurement_dim"],
-    #     measurement_device: object,
-    #     measurement_device_covariance,
-    # ):
-    #     measurement_jacobian = jax.jacfwd(measurement_device)(point)
-    #     if self.debug:
-    #         assert isinstance(
-    #             measurement_jacobian, Float[Array, "measurement_dim state_dim"]
-    #         )
-    #         jax.debug.callback(has_nan, measurement_jacobian)
-
-    #     kalman_gain = (
-    #         prior_mixture_covariance
-    #         @ measurement_jacobian.T
-    #         @ jnp.linalg.inv(
-    #             measurement_jacobian @ prior_mixture_covariance @ measurement_jacobian.T
-    #             + measurement_device_covariance
-    #         )
-    #     )
-    #     if self.debug:
-    #         assert isinstance(kalman_gain, Float[Array, "state_dim measurement_dim"])
-    #         jax.debug.callback(has_nan, kalman_gain)
-
-    #     gaussian_mixture_covariance = (
-    #         jnp.eye(point.shape[0]) - kalman_gain @ measurement_jacobian
-    #     ) @ prior_mixture_covariance  # + 1e-10 * jnp.eye(point.shape[0])
-    #     if self.debug:
-    #         assert isinstance(
-    #             gaussian_mixture_covariance, Float[Array, "state_dim state_dim"]
-    #         )
-    #         # jax.debug.callback(is_positive_definite, gaussian_mixture_covariance)
-    #         jax.debug.callback(has_nan, gaussian_mixture_covariance)
-
-    #     posterior_point = point - (
-    #         kalman_gain @ jnp.atleast_2d(measurement_device(point) - measurement)
-    #     ).reshape(-1)
-    #     if self.debug:
-    #         assert isinstance(point, Float[Array, "state_dim"])
-
-    #     logposterior_weights = jsp.stats.multivariate_normal.logpdf(
-    #         measurement,
-    #         measurement_device(point),
-    #         measurement_jacobian @ prior_mixture_covariance @ measurement_jacobian.T
-    #         + measurement_device_covariance,
-    #     )
-    #     if self.debug:
-    #         assert isinstance(logposterior_weights, Float[Array, ""])
-
-    #     return posterior_point, logposterior_weights, gaussian_mixture_covariance
-
     @jaxtyped(typechecker=typechecker)
     @eqx.filter_jit
     def update_point(

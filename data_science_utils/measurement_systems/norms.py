@@ -20,7 +20,10 @@ def norm_measurement(
 
 @jaxtyped(typechecker=typechecker)
 class RangeSensor(AbstractMeasurementSystem):
-    covariance: Float[Array, "1 1"]
+    covariance: Float[Array, "1 1"] = eqx.field(
+        default_factory=lambda: jnp.array([[0.25]])
+    )
+
 
     @jaxtyped(typechecker=typechecker)
     @eqx.filter_jit

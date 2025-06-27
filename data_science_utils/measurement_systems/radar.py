@@ -14,7 +14,7 @@ class Radar(AbstractMeasurementSystem, strict=True):
     Then returns the distance, elevation and azimuth.
     """
 
-    covariance: Float[Array, "3"] = eqx.field(
+    covariance: Float[Array, "3 3"] = eqx.field(
         default_factory=lambda: jnp.diag(jnp.array([(1.0) ** 2,
                                                     (0.5 * jnp.pi / 180) ** 2,
                                                     (0.5 * jnp.pi / 180) ** 2]))

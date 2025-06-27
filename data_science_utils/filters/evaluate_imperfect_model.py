@@ -73,7 +73,7 @@ def evaluate_filter_imperfect(
 ) -> Float[Array, "..."]:
     # Should Prob Be static args ^
     ensemble_size = 100
-    burn_in_time = 10
+    burn_in_time = 100
     measurement_time = 10 * burn_in_time
     total_steps = burn_in_time + measurement_time
 
@@ -91,7 +91,7 @@ def evaluate_filter_imperfect(
     )
 
     (final_carry, errors_over_time) = jax.lax.scan(
-        scan_step, (initial_ensemble, initial_true_state, 100.0), keys
+        scan_step, (initial_ensemble, initial_true_state, 10000.0), keys
     )
 
     errors_past_burn_in = errors_over_time[burn_in_time:]
@@ -104,7 +104,7 @@ def maneuver_normal_with_fuel(
     fuel: float,
     key: Key[Array, "..."]
 ) -> tuple[Float[Array, "6"], float]:
-    jax.debug.print("Fuel {}", fuel)
+    # jax.debug.print("Fuel {}", fuel)
     delta_v_raw = jax.random.normal(key, (3,))
     delta_v_magnitude = jnp.linalg.norm(delta_v_raw)
     maneuver_magnitude = jnp.minimum(delta_v_magnitude, fuel)

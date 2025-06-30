@@ -1,9 +1,21 @@
 import jax
 import jax.numpy as jnp
+import equinox as eqx
 
+def initialize_ensemble(key, batch_size):
+    return jax.random.normal(key, (batch_size,))
 
-def f(key):
-    return jnp.arange(jax.random.poisson(key, 10.0))
+def create_variable_measurement(key):
+    n = jax.random.poisson(key, lam=10.0)
+    n = jnp.minimum(n, 40)
+    x = jax.random.normal(key, shape=(40,))
+    
+    return x
 
-f = jax.jit(f, static_argnums=(0,))
-f(jax.random.key(0))
+@eqx.filter_jit
+def create_ensemble_process_measurement(key):
+    ensemble = initialize_ensemble(key, 10)
+    measurements = create_variable_measurement(key)
+    return 0
+
+create_ensemble_process_measurement(jax.random.key(0))

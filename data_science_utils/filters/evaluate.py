@@ -67,10 +67,9 @@ def evaluate_filter(
     key: Key[Array, "..."],
     debug: bool = False,
 ) -> Float[Array, "..."]:
-    # Should Prob Be static args ^
     ensemble_size = 100
     burn_in_time = 100
-    measurement_time = 10 * burn_in_time
+    measurement_time = 1000
     total_steps = burn_in_time + measurement_time
 
     key, subkey = jax.random.split(key)
@@ -94,5 +93,3 @@ def evaluate_filter(
     rmse = jnp.sqrt(jnp.mean(errors_past_burn_in**2))
 
     return rmse
-
-

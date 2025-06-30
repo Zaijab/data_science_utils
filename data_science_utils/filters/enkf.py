@@ -11,7 +11,7 @@ from data_science_utils.measurement_systems import AbstractMeasurementSystem
 
 @jaxtyped(typechecker=typechecker)
 class EnKF(AbstractFilter, strict=True):
-    inflation_factor: float = 1.01
+    inflation_factor: float = 1.05
     debug: bool = False
 
     @jaxtyped(typechecker=typechecker)
@@ -115,7 +115,7 @@ class EnKF(AbstractFilter, strict=True):
             self.update_point,
             in_axes=(0, None, None, None),
         )(
-            prior_ensemble,
+            inflated,
             ensemble_covariance,
             measurement,
             measurement_system,

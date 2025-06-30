@@ -114,6 +114,16 @@ def evaluate_filter_imperfect(
 
     return rmse
 
+
+# Change total fuel to be 10 or 100
+# Use JPL CR3BP look for initial conditions identity matrix initial covariance
+# Filter with sparse measurements
+# Use measurement covariances from Schroeder
+# Read through sensor tasking algorithms
+# Implement the windowing for tracking
+
+# 2 column 6 page limit
+
 def maneuver_normal_with_fuel(
     state: Float[Array, "6"],
     fuel: float,

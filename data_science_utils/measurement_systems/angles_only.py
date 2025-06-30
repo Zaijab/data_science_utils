@@ -15,8 +15,8 @@ class AnglesOnly(AbstractMeasurementSystem, strict=True):
     """
 
     covariance: Float[Array, "2"] = eqx.field(
-        default_factory=lambda: jnp.diag(jnp.array([(0.5 * jnp.pi / 180) ** 2,
-                                                    (0.5 * jnp.pi / 180) ** 2]))
+        default_factory=lambda: jnp.diag(jnp.array([(0.1 * jnp.pi / 180) ** 2,
+                                                    (0.1 * jnp.pi / 180) ** 2]))
     )
 
     @jaxtyped(typechecker=typechecker)

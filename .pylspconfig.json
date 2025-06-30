@@ -3,7 +3,7 @@
     "configurationSources": ["flake8"],
     "plugins": {
       "pycodestyle": {
-        "enabled": true
+        "enabled": false
       },
       "pyflakes": {
         "enabled": true

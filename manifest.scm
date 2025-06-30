@@ -10,6 +10,9 @@
 	     (gnu packages image-processing)
 	     (gnu packages python)
 	     (gnu packages jupyter)
+	     (gnu packages base)
+	     (gnu packages bash)
+	     (gnu packages shellutils)
 	     (gnu packages databases)
 	     (gnu packages docker)
 	     (gnu packages python-web)
@@ -870,14 +873,14 @@ setuptools.setup(
 (define-public python-mlflow-wheel
   (package
     (name "python-mlflow")
-    (version "2.22.0")
+    (version "3.1.1")
     (build-system pyproject-build-system)
     (source
      (origin
        (method url-fetch)
        (uri (pypi-wheel-url "mlflow" version))
        (sha256
-        (base32 "0llvpjjxgipxnzd9v25mhc5izm01nzgav6xac31q3cypkgip5nis"))
+        (base32 "0bl7324l2h304gapwn0qg376fmcdyd8gsid60gigs5r254sk718n"))
        (file-name (string-append name "-" version ".whl"))))
     (arguments
      (list
@@ -927,8 +930,6 @@ setuptools.setup(
 			     python-mlflow-skinny
 			     
 			     
-			     
-
 			     python-pyyaml
 			     python-pydantic
 			     python-protobuf
@@ -1028,17 +1029,24 @@ need to use the older and less efficient @code{pkg_resources} package.")
 ;; TODO INSTALL OPTINA FOR HYPERPARAMETER SEARCH
 
 (packages->manifest (list
+
+		     coreutils
+		     bash
+		     sed
+		     binutils
+		     direnv
+		     
 		     python
 		     jupyter
 		     python-ott-jax
-		     python-pyflakes
+		     ;; python-pyflakes
 		     python-numpy
 		     python-pandas
 		     python-matplotlib
 		     python-seaborn
 		     python-scikit-learn
-		     python-pytorch
-		     python-tensorflow
+		     ;; python-pytorch
+		     ;; python-tensorflow
 		     python-jax
 		     python-jaxtyping-three
 		     python-beartype
@@ -1046,13 +1054,14 @@ need to use the older and less efficient @code{pkg_resources} package.")
 		     python-flax
 		     python-optimistix
 		     python-diffrax
-		     python-waymax
-		     python-evosax
-		     python-databricks-sdk
-		     python-opentelemetry-api
-		     python-opentelemetry-semantic-conventions
-		     python-opentelemetry-sdk
-		     python-mlflow-wheel
-		     python-sqlparse
-		     python-tensorboard
-		     python-plotly))
+		     ;; python-waymax
+		     ;; python-evosax
+		     ;; python-databricks-sdk
+		     ;; python-opentelemetry-api
+		     ;; python-opentelemetry-semantic-conventions
+		     ;; python-opentelemetry-sdk
+		     ;; python-mlflow-wheel
+		     ;; python-sqlparse
+		     ;; python-tensorboard
+		     ;; python-plotly
+		     ))

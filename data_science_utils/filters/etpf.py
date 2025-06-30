@@ -1,14 +1,17 @@
+from typing import Any
+
+import equinox as eqx
 import jax
 import jax.numpy as jnp
-from ott.solvers.linear import sinkhorn
+from beartype import beartype as typechecker
+from evosax import CMA_ES
+from jaxtyping import Array, Float, Key, jaxtyped
 from ott.geometry import pointcloud
 from ott.problems.linear import linear_problem
-import equinox as eqx
-from jaxtyping import jaxtyped, Float, Array, Key
-from beartype import beartype as typechecker
-from typing import Any
+from ott.solvers.linear import sinkhorn
+
+from data_science_utils.filters import AbstractFilter
 from data_science_utils.measurement_systems import AbstractMeasurementSystem
-from evosax import CMA_ES
 
 
 @jaxtyped(typechecker=typechecker)
@@ -156,6 +159,44 @@ def etpf_update(
     updated_ensemble = updated_ensemble + noise
 
     return updated_ensemble
+
+
+class ETPF(AbstractFilter, strict=True):
+    @jaxtyped(typechecker=typechecker)
+    @eqx.filter_jit
+    def update(
+        self,
+        key: Key[Array, "..."],
+        prior_ensemble: Float[Array, "batch_size state_dim"],
+        measurement: Float[Array, "measurement_dim"],
+        measurement_system: AbstractMeasurementSystem,
+        debug: bool = False,
+    ) -> Float[Array, "batch_size state_dim"]:
+        weights = compute_weights(prior_ensemble, measurement, measurement_system)
+        assert isinstance(weights, Float[Array, "batch_size"])
+
+        transport_matrix = solve_optimal_transport(prior_ensemble, weights)
+        assert isinstance(transport_matrix, Float[Array, "batch_size batch_size"])
+
+        P = prior_ensemble.shape[0] * transport_matrix
+        updated_ensemble = P @ prior_ensemble
+        assert isinstance(updated_ensemble, Float[Array, "batch_size state_dim"])
+
+        # Rejuvenation
+        tau = 0.2  # alpha = \sqrt{1 + tau} = ~1.01
+        cov_matrix = tau * jnp.cov(updated_ensemble, rowvar=False) + jnp.ones(2) * 1e-7
+
+        noise_key, new_key = jax.random.split(key)
+        noise = jax.random.multivariate_normal(
+            noise_key,
+            mean=jnp.zeros(prior_ensemble.shape[1]),
+            cov=cov_matrix,
+            shape=(prior_ensemble.shape[0],),
+        )
+
+        updated_ensemble = updated_ensemble + noise
+
+        return updated_ensemble
 
 
 # Create callbacks to inspect values during runtime

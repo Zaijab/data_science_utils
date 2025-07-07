@@ -683,6 +683,25 @@ setuptools.setup(
     (description "Linear solvers in JAX and Equinox.")
     (license #f)))
 
+(define-public python-distreqx
+  (package
+    (name "python-diffrax")
+    (version "0.0.1")
+    (source
+     (origin
+       (method url-fetch)
+       (uri (pypi-uri "distreqx" version))
+       (sha256
+        (base32 "1i8kh1ngk3sxry0mdkyavlvzn086qzwjrk240bcm7ds9qgrmzabi"))))
+    (build-system pyproject-build-system)
+    (arguments (list #:tests? #f))
+    (propagated-inputs (list python-jax python-jaxtyping-three python-equinox))
+    (native-inputs (list python-setuptools python-hatchling python-wheel))
+    (home-page #f)
+    (synopsis "Linear solvers in JAX and Equinox.")
+    (description "Linear solvers in JAX and Equinox.")
+    (license #f)))
+
 
 (define-public python-opentelemetry-api
   (package
@@ -873,14 +892,14 @@ setuptools.setup(
 (define-public python-mlflow-wheel
   (package
     (name "python-mlflow")
-    (version "3.1.1")
+    (version "2.22.0")
     (build-system pyproject-build-system)
     (source
      (origin
        (method url-fetch)
        (uri (pypi-wheel-url "mlflow" version))
        (sha256
-        (base32 "0bl7324l2h304gapwn0qg376fmcdyd8gsid60gigs5r254sk718n"))
+        (base32 "0llvpjjxgipxnzd9v25mhc5izm01nzgav6xac31q3cypkgip5nis"))
        (file-name (string-append name "-" version ".whl"))))
     (arguments
      (list
@@ -1039,14 +1058,14 @@ need to use the older and less efficient @code{pkg_resources} package.")
 		     python
 		     jupyter
 		     python-ott-jax
-		     ;; python-pyflakes
+		     python-pyflakes
 		     python-numpy
 		     python-pandas
 		     python-matplotlib
 		     python-seaborn
 		     python-scikit-learn
-		     ;; python-pytorch
-		     ;; python-tensorflow
+		     python-pytorch
+		     python-tensorflow
 		     python-jax
 		     python-jaxtyping-three
 		     python-beartype
@@ -1054,14 +1073,17 @@ need to use the older and less efficient @code{pkg_resources} package.")
 		     python-flax
 		     python-optimistix
 		     python-diffrax
-		     ;; python-waymax
-		     ;; python-evosax
-		     ;; python-databricks-sdk
-		     ;; python-opentelemetry-api
-		     ;; python-opentelemetry-semantic-conventions
-		     ;; python-opentelemetry-sdk
+		     python-waymax
+		     python-evosax
+		     python-databricks-sdk
+		     python-opentelemetry-api
+		     python-opentelemetry-semantic-conventions
+		     python-opentelemetry-sdk
+		     
 		     ;; python-mlflow-wheel
-		     ;; python-sqlparse
-		     ;; python-tensorboard
-		     ;; python-plotly
+		     
+		     python-sqlparse
+		     python-tensorboard
+		     python-plotly
+		     python-distreqx
 		     ))

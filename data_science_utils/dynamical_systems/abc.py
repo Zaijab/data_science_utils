@@ -2,9 +2,9 @@
 This module describes dynamical systems for the express purpose of evaluating stochastic filtering algorithms.
 The ABC structure allows the user to define their choice of dynamical system to reduce code duplication.
 
-# TODO: Create Stochastic Systems
-#     - This introduces noise (of our choice) to the forward equations
-#     - This changes the type signatures for the forward (hence, trajectory, orbit, flow) functions
+TODO: Create Stochastic Systems
+    - This introduces noise (of our choice) to the forward equations
+    - This changes the type signatures for the forward (hence, trajectory, orbit, flow) functions
 
 TODO: Create Multi-Object Systems
     - This has a forward map of shape state: Float[Array, "num_objects state_dim"]

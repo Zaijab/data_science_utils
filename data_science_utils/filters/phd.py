@@ -141,7 +141,6 @@ class EnGMPHD(eqx.Module, strict=True):
             assert isinstance(mixture_covariance, Float[Array, "state_dim state_dim"])
 
 
-
         ### EnKF Update Per Measurement
         def process_measurement(measurement):
             return jax.vmap(self.update_point, in_axes=(0, None, None, None))(

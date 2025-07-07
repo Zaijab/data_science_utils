@@ -11,10 +11,6 @@ A common way to compare models is to run a different model on a public, well-kno
 This module contains code which brings together multiple modules which need to work together.
 Testing this module entails 
 
-* TODO 
-
-* TODO 
-
 * Organizational Principles
 
 =data_science_utils/*= Contains modules
@@ -30,3 +26,9 @@ Every individual module is tested in =tests/unit/test_*.py=
 In this module, there are several types of dynamical systems sharing a somewhat unified interface.
 
 Simply put, a dynamical system is defined by its trajectory. There are several independent adjectives by which a dynamical system can be described. It can be discrete or continuous. Discrete systems can be further stratified into invertable or noninvertible systems. It can be deterministic or stochastic. It can operate over swarms or individuals. It can operate over random finite sets or on a constant cardinality of states. Each of these adjectives subtly change the function signature for their respective forward equations, hence the =trajectory= method.
+
+* TODO List
+
+** Get accurate code coverage
+
+** Translate Guix environment to venv on the fly

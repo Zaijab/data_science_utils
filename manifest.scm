@@ -667,13 +667,13 @@ setuptools.setup(
 (define-public python-diffrax
   (package
     (name "python-diffrax")
-    (version "0.6.1")
+    (version "0.7.0")
     (source
      (origin
        (method url-fetch)
        (uri (pypi-uri "diffrax" version))
        (sha256
-        (base32 "1gxqzjqwi1vwa3s6i78rq4mdxsrsc8dyyhkknip5bcpqphjbml6q"))))
+        (base32 "1w8nachby91601b9prjdyxibmhbnvv0m8nkgzj3cmacjrmwcbg7k"))))
     (build-system pyproject-build-system)
     (arguments (list #:tests? #f))
     (propagated-inputs (list python-jax python-jaxtyping-three python-typing-extensions python-typeguard python-equinox python-lineax python-optimistix))

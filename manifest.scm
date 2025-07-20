@@ -1057,8 +1057,15 @@ need to use the older and less efficient @code{pkg_resources} package.")
 		     
 		     python
 		     jupyter
+		     python-lsp-server
+		     python-lsp-black
+		     python-flake8
+		     python-pylsp-mypy
+		     python-pytest
+		     python-pytest-mypy
+		     
 		     python-ott-jax
-		     python-pyflakes
+		     
 		     python-numpy
 		     python-pandas
 		     python-matplotlib

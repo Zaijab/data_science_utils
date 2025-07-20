@@ -32,3 +32,14 @@ Simply put, a dynamical system is defined by its trajectory. There are several i
 ** Get accurate code coverage
 
 ** Translate Guix environment to venv on the fly
+
+** Jupyter Test
+
+#+BEGIN_SRC jupyter-python :session test
+import jax
+import uuid
+jax.random.normal(jax.random.key(int(uuid.uuid4()) % 10000))
+#+END_SRC
+
+#+RESULTS:
+: Array(0.88381496, dtype=float64)

@@ -1,6 +1,8 @@
 (define-module (data-science-utils)
   #:use-module (gnu)
   #:use-module (gnu packages python-xyz) ; numpy
+  #:use-module (gnu packages python-build) ; python-setuptools
+  #:use-module (gnu packages check) ; python-pytest
   #:use-module (guix-science packages python) ; jax
   #:use-module (guix packages) ; Record: package
   #:use-module (guix build-system pyproject) ; pyproject build system
@@ -20,6 +22,9 @@
                       #:recursive? #t
                       #:select? vcs-file?))
   (build-system pyproject-build-system)
+  (native-inputs (list python-setuptools
+		       python-wheel
+		       python-pytest))
   (home-page "")
   (synopsis "")
   (description "")

@@ -6,7 +6,7 @@ import jax.numpy as jnp
 import jax
 import optax
 from data_science_utils.statistics import logpdf_epanechnikov
-
+# Oh snap
 
 @eqx.filter_value_and_grad
 def kl_divergence(

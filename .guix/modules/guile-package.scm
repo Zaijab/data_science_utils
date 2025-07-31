@@ -10,19 +10,27 @@
   #:use-module (guix utils)  ;for ‘current-source-directory’
   #:use-module ((guix licenses) #:prefix license:))
 
-(define vcs-file?
-  ;; Return true if the given file is under version control.
-  (or (git-predicate (current-source-directory))
-      (const #t)))                                ;not in a Git checkout
+;; (define vcs-file?
+;;   ;; Return true if the given file is under version control.
+;;   (or (git-predicate (current-source-directory))
+;;       (const #t)))                                ;not in a Git checkout
 
 (package
   (name "data_science_utils")
   (version "0.99-git")
   (source (local-file "." "data_science_utils_checkout"
                       #:recursive? #t
-                      #:select? vcs-file?))
+                      ;#:select? vcs-file?
+		      ))
   (build-system pyproject-build-system)
-  (arguments `(#:tests? #f))
+  ;; (arguments `(#:tests? #f))
+  (arguments `(#:tests? #f
+             #:phases
+             (modify-phases %standard-phases
+               (add-before 'build 'show-files
+                 (lambda _
+                   (system* "find" "." "-name" "*.toml")
+                   (system* "cat" "pyproject.toml"))))))
   (native-inputs (list python-setuptools
 		       python-wheel
 		       python-pytest))

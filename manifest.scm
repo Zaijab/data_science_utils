@@ -10,6 +10,7 @@
 	     (gnu packages image-processing)
 	     (gnu packages python)
 	     (gnu packages jupyter)
+	     (gnu packages cpp)
 	     (gnu packages base)
 	     (gnu packages bash)
 	     (gnu packages shellutils)
@@ -153,13 +154,13 @@ PyTrees.")
   (package
     (name "python-optax")
     ;; 0.1.6 needs a more recent numpy
-    (version "0.2.4")
+    (version "0.2.5")
     (source
      (origin
        (method url-fetch)
        (uri (pypi-uri "optax" version))
        (sha256
-        (base32 "0dkkyh2a6j94k6g5xljfbl1hqfndwqvax1wi656dwvby63ax61af"))))
+        (base32 "156mhr9wcqf53ghyjcb1dw67dvz6b2iag2vmmvg8cq9px9x8rqxj"))))
     (build-system pyproject-build-system)
     ;; Tests require haiku, tensorflow, and flax, but flax needs
     ;; optax.
@@ -175,8 +176,9 @@ PyTrees.")
            python-pytest
            python-setuptools	   
 	   python-flit-core
-	   python-etils
-           python-wheel))
+	   ;; python-etils
+           python-wheel
+	   ))
     (home-page "https://github.com/google-deepmind/optax/")
     (synopsis "Gradient processing and optimization library for JAX")
     (description "Optax is a gradient processing and optimization
@@ -216,7 +218,7 @@ library for JAX.")
         (base32 "0ljyfvq7ylsyhsxkj5gygsbzc7x7p0d28avawq323inlflba9bha"))))
     (build-system pyproject-build-system)
     (arguments (list #:tests? #f))
-    (native-inputs (list python-hatchling python-setuptools python-etils))
+    (native-inputs (list python-hatchling python-setuptools python-etils abseil-cpp))
     (propagated-inputs (list python-jax
                              python-jaxopt
                              python-lineax
@@ -499,7 +501,7 @@ planar geometric objects.  It is based on the @code{GEOS} library.")
     (description "Official APIs for the MS-COCO dataset.")
     (license #f)))
 
-(define-public python-nuscenes-devkit
+#;(define-public python-nuscenes-devkit
   (package
     (name "python-nuscenes-devkit")
     (version "932064c611ddfe06e3d1fadea904eb365482a03b")
@@ -676,7 +678,13 @@ setuptools.setup(
         (base32 "1w8nachby91601b9prjdyxibmhbnvv0m8nkgzj3cmacjrmwcbg7k"))))
     (build-system pyproject-build-system)
     (arguments (list #:tests? #f))
-    (propagated-inputs (list python-jax python-jaxtyping-three python-typing-extensions python-typeguard python-equinox python-lineax python-optimistix))
+    (propagated-inputs (list python-jax
+			     python-jaxtyping-three
+			     python-typing-extensions
+			     python-typeguard
+			     python-equinox
+			     python-lineax
+			     python-optimistix))
     (native-inputs (list python-hatchling))
     (home-page #f)
     (synopsis "Linear solvers in JAX and Equinox.")
@@ -783,67 +791,67 @@ setuptools.setup(
     (license #f)))
 
 
-(define-public python-mlflow-skinny
-  (package
-    (name "python-mlflow-skinny")
-    (version "2.22.0")
-    (source
-     (origin
-       (method url-fetch)
-       (uri (pypi-uri "mlflow_skinny" version))
-       (sha256
-        (base32 "1kkwhpv0claf1gkvvhw20qwzqf3hdga39nbc9180d69q02bmhjvp"))))
-    (build-system pyproject-build-system)
-    (arguments (list #:tests? #f))
-    (propagated-inputs (list python-cachetools
-			     python-click
-			     python-cloudpickle
-			     python-databricks-sdk
-			     python-fastapi
-			     python-gitpython
-			     python-importlib-metadata-6
+;; (define-public python-mlflow-skinny
+;;   (package
+;;     (name "python-mlflow-skinny")
+;;     (version "2.22.0")
+;;     (source
+;;      (origin
+;;        (method url-fetch)
+;;        (uri (pypi-uri "mlflow_skinny" version))
+;;        (sha256
+;;         (base32 "1kkwhpv0claf1gkvvhw20qwzqf3hdga39nbc9180d69q02bmhjvp"))))
+;;     (build-system pyproject-build-system)
+;;     (arguments (list #:tests? #f))
+;;     (propagated-inputs (list python-cachetools
+;; 			     python-click
+;; 			     python-cloudpickle
+;; 			     python-databricks-sdk
+;; 			     python-fastapi
+;; 			     python-gitpython
+;; 			     python-importlib-metadata-6
 
-			     python-opentelemetry-api
-			     python-opentelemetry-sdk
+;; 			     python-opentelemetry-api
+;; 			     python-opentelemetry-sdk
 
-			     python-packaging
-			     python-protobuf
-			     python-pydantic
-			     python-pyyaml
-			     python-requests
-			     python-sqlparse
-			     python-typing-extensions
-			     python-uvicorn			     
+;; 			     python-packaging
+;; 			     python-protobuf
+;; 			     python-pydantic
+;; 			     python-pyyaml
+;; 			     python-requests
+;; 			     python-sqlparse
+;; 			     python-typing-extensions
+;; 			     python-uvicorn			     
 			     
-			     python-alembic
-			     python-docker
-			     python-flask
-			     python-numpy
-			     python-scipy
-			     python-pandas
-			     python-sqlalchemy
-			     gunicorn
+;; 			     python-alembic
+;; 			     python-docker
+;; 			     python-flask
+;; 			     python-numpy
+;; 			     python-scipy
+;; 			     python-pandas
+;; 			     python-sqlalchemy
+;; 			     gunicorn
 
 
-			     python-scikit-learn
-			     python-pyarrow
-			     markdown
-			     python-jinja2
-			     python-matplotlib
-			     python-graphene
+;; 			     python-scikit-learn
+;; 			     python-pyarrow
+;; 			     markdown
+;; 			     python-jinja2
+;; 			     python-matplotlib
+;; 			     python-graphene
 			     
 			     
 			     
 
-			     python-pyyaml
-			     python-pydantic
-			     python-protobuf
-			     python-packaging
-			     python-databricks-cli))
-    (home-page #f)
-    (synopsis "Linear solvers in JAX and Equinox.")
-    (description "Linear solvers in JAX and Equinox.")
-    (license #f)))
+;; 			     python-pyyaml
+;; 			     python-pydantic
+;; 			     python-protobuf
+;; 			     python-packaging
+;; 			     python-databricks-cli))
+;;     (home-page #f)
+;;     (synopsis "Linear solvers in JAX and Equinox.")
+;;     (description "Linear solvers in JAX and Equinox.")
+;;     (license #f)))
 
 
 ;; (define-public python-mlflow
@@ -889,208 +897,184 @@ setuptools.setup(
 
 ;; This package is a stop-gap that builds Tensorboard from the pre-built wheels, instead of
 ;; packaging it from scratch, which requires a Bazel+NPM build
-(define-public python-mlflow-wheel
-  (package
-    (name "python-mlflow")
-    (version "2.22.0")
-    (build-system pyproject-build-system)
-    (source
-     (origin
-       (method url-fetch)
-       (uri (pypi-wheel-url "mlflow" version))
-       (sha256
-        (base32 "0llvpjjxgipxnzd9v25mhc5izm01nzgav6xac31q3cypkgip5nis"))
-       (file-name (string-append name "-" version ".whl"))))
-    (arguments
-     (list
-      #:tests? #f ;Tests are not distributed with the wheel
-      #:phases #~(modify-phases %standard-phases
-                   (replace 'build
-                     (lambda* (#:key source #:allow-other-keys)
-                       (mkdir-p "dist")
-                       (install-file source "dist"))))))
+;; (define-public python-mlflow-wheel
+;;   (package
+;;     (name "python-mlflow")
+;;     (version "2.22.0")
+;;     (build-system pyproject-build-system)
+;;     (source
+;;      (origin
+;;        (method url-fetch)
+;;        (uri (pypi-wheel-url "mlflow" version))
+;;        (sha256
+;;         (base32 "0llvpjjxgipxnzd9v25mhc5izm01nzgav6xac31q3cypkgip5nis"))
+;;        (file-name (string-append name "-" version ".whl"))))
+;;     (arguments
+;;      `(
+;;       #:tests? #f ;Tests are not distributed with the wheel
+;;       #:phases (modify-phases %standard-phases
+;;                    (replace 'build
+;;                      (lambda* (#:key source #:allow-other-keys)
+;;                        (mkdir-p "dist")
+;;                        (install-file source "dist"))))))
     
-    (propagated-inputs (list python-cachetools
-			     python-click
-			     python-cloudpickle
-			     python-databricks-sdk
-			     python-fastapi
-			     python-gitpython
-			     python-importlib-metadata-6
+;;     (propagated-inputs (list python-cachetools
+;; 			     python-click
+;; 			     python-cloudpickle
+;; 			     python-databricks-sdk
+;; 			     python-fastapi
+;; 			     python-gitpython
+;; 			     python-importlib-metadata-6
 
-			     python-opentelemetry-api
-			     python-opentelemetry-sdk
+;; 			     python-opentelemetry-api
+;; 			     python-opentelemetry-sdk
 
-			     python-packaging
-			     python-protobuf
-			     python-pydantic
-			     python-pyyaml
-			     python-requests
-			     python-sqlparse
-			     python-typing-extensions
-			     python-uvicorn			     
+;; 			     python-packaging
+;; 			     python-protobuf
+;; 			     python-pydantic
+;; 			     python-pyyaml
+;; 			     python-requests
+;; 			     python-sqlparse
+;; 			     python-typing-extensions
+;; 			     python-uvicorn			     
 			     
-			     python-alembic
-			     python-docker
-			     python-flask
-			     python-numpy
-			     python-scipy
-			     python-pandas
-			     python-sqlalchemy
-			     gunicorn
+;; 			     python-alembic
+;; 			     python-docker
+;; 			     python-flask
+;; 			     python-numpy
+;; 			     python-scipy
+;; 			     python-pandas
+;; 			     python-sqlalchemy
+;; 			     gunicorn
 
 
-			     python-scikit-learn
-			     python-pyarrow
-			     markdown
-			     python-jinja2
-			     python-matplotlib
-			     python-graphene
-			     python-mlflow-skinny
+;; 			     python-scikit-learn
+;; 			     python-pyarrow
+;; 			     markdown
+;; 			     python-jinja2
+;; 			     python-matplotlib
+;; 			     python-graphene
+;; 			     python-mlflow-skinny
 			     
 			     
-			     python-pyyaml
-			     python-pydantic
-			     python-protobuf
-			     python-packaging
-			     python-databricks-cli))
+;; 			     python-pyyaml
+;; 			     python-pydantic
+;; 			     python-protobuf
+;; 			     python-packaging
+;; 			     python-databricks-cli))
     
-    (home-page "https://www.tensorflow.org")
-    (synopsis "Fast data loading for TensorBoard")
-    (description
-     "The Tensorboard Data Server is the backend component of TensorBoard that efficiently processes
-and serves log data. It improves TensorBoard's performance by handling large-scale event files
-asynchronously, enabling faster data loading and reduced memory usage.")
-    (license license:asl2.0)))
-
-;; This package is a stop-gap that builds Tensorboard from the pre-built wheels, instead of
-;; packaging it from scratch, which requires a Bazel+NPM build
-(define-public python-jax-wheel
-  (package
-    (name "python-mlflow")
-    (version "2.22.0")
-    (build-system pyproject-build-system)
-    (source
-     (origin
-       (method url-fetch)
-       (uri (pypi-wheel-url "mlflow" version))
-       (sha256
-        (base32 "0llvpjjxgipxnzd9v25mhc5izm01nzgav6xac31q3cypkgip5nis"))
-       (file-name (string-append name "-" version ".whl"))))
-    (arguments
-     (list
-      #:tests? #f ;Tests are not distributed with the wheel
-      #:phases #~(modify-phases %standard-phases
-                   (replace 'build
-                     (lambda* (#:key source #:allow-other-keys)
-                       (mkdir-p "dist")
-                       (install-file source "dist"))))))
-    
-    (home-page "https://www.tensorflow.org")
-    (synopsis "Fast data loading for TensorBoard")
-    (description
-     "The Tensorboard Data Server is the backend component of TensorBoard that efficiently processes
-and serves log data. It improves TensorBoard's performance by handling large-scale event files
-asynchronously, enabling faster data loading and reduced memory usage.")
-    (license license:asl2.0)))
+;;     (home-page "https://www.tensorflow.org")
+;;     (synopsis "Fast data loading for TensorBoard")
+;;     (description
+;;      "The Tensorboard Data Server is the backend component of TensorBoard that efficiently processes
+;; and serves log data. It improves TensorBoard's performance by handling large-scale event files
+;; asynchronously, enabling faster data loading and reduced memory usage.")
+;;     (license license:asl2.0)))
 
 
-(define-public python-importlib-metadata-6
-  (package
-    (name "python-importlib-metadata")
-    (version "6.5.0")
-    (source
-     (origin
-       (method url-fetch)
-       (uri (pypi-uri "importlib_metadata" version))
-       (sha256
-        (base32
-         "0i808qj8ci40qnps9fr63fj4yszzwzk9kjgvbizjj9m7qcdxz2vs"))))
-    (build-system python-build-system)
-    (arguments
-     (list
-      #:phases
-      #~(modify-phases %standard-phases
-          ;; XXX: PEP 517 manual build/install procedures copied from
-          ;; python-isort.
-          (replace 'build
-            (lambda _
-              ;; ZIP does not support timestamps before 1980.
-              (setenv "SOURCE_DATE_EPOCH" "315532800")
-              (invoke "python" "-m" "build" "--wheel" "--no-isolation" ".")))
-          (replace 'install
-            (lambda* (#:key outputs #:allow-other-keys)
-              (let ((whl (car (find-files "dist" "\\.whl$"))))
-                (invoke "pip" "--no-cache-dir" "--no-input"
-                        "install" "--no-deps" "--prefix" #$output whl))))
-          (replace 'check
-            (lambda* (#:key tests? #:allow-other-keys)
-              (when tests?
-                (invoke "pytest" "-vv" "tests")))))))
-    (propagated-inputs (list python-zipp))
-    (native-inputs
-     (list python-pypa-build
-           python-pyfakefs
-           python-pytest
-           python-setuptools-scm))
-    (home-page "https://importlib-metadata.readthedocs.io/")
-    (synopsis "Read metadata from Python packages")
-    (description
-     "@code{importlib_metadata} is a library which provides an API for
-accessing an installed Python package's metadata, such as its entry points or
-its top-level name.  This functionality intends to replace most uses of
-@code{pkg_resources} entry point API and metadata API.  Along with
-@code{importlib.resources} in Python 3.7 and newer, this can eliminate the
-need to use the older and less efficient @code{pkg_resources} package.")
-    (license license:asl2.0)))
+
+;; (define-public python-importlib-metadata-6
+;;   (package
+;;     (name "python-importlib-metadata")
+;;     (version "6.5.0")
+;;     (source
+;;      (origin
+;;        (method url-fetch)
+;;        (uri (pypi-uri "importlib_metadata" version))
+;;        (sha256
+;;         (base32
+;;          "0i808qj8ci40qnps9fr63fj4yszzwzk9kjgvbizjj9m7qcdxz2vs"))))
+;;     (build-system python-build-system)
+;;     (arguments
+;;      `(
+;;       #:phases
+;;       #~(modify-phases %standard-phases
+;;           ;; XXX: PEP 517 manual build/install procedures copied from
+;;           ;; python-isort.
+;;           (replace 'build
+;;             (lambda _
+;;               ;; ZIP does not support timestamps before 1980.
+;;               (setenv "SOURCE_DATE_EPOCH" "315532800")
+;;               (invoke "python" "-m" "build" "--wheel" "--no-isolation" ".")))
+;;           (replace 'install
+;;             (lambda* (#:key outputs #:allow-other-keys)
+;;               (let ((whl (car (find-files "dist" "\\.whl$"))))
+;;                 (invoke "pip" "--no-cache-dir" "--no-input"
+;;                         "install" "--no-deps" "--prefix" #$output whl))))
+;;           (replace 'check
+;;             (lambda* (#:key tests? #:allow-other-keys)
+;;               (when tests?
+;;                 (invoke "pytest" "-vv" "tests")))))))
+;;     (propagated-inputs (list python-zipp))
+;;     (native-inputs
+;;      (list python-pypa-build
+;;            python-pyfakefs
+;;            python-pytest
+;;            python-setuptools-scm))
+;;     (home-page "https://importlib-metadata.readthedocs.io/")
+;;     (synopsis "Read metadata from Python packages")
+;;     (description
+;;      "@code{importlib_metadata} is a library which provides an API for
+;; accessing an installed Python package's metadata, such as its entry points or
+;; its top-level name.  This functionality intends to replace most uses of
+;; @code{pkg_resources} entry point API and metadata API.  Along with
+;; @code{importlib.resources} in Python 3.7 and newer, this can eliminate the
+;; need to use the older and less efficient @code{pkg_resources} package.")
+;;     (license license:asl2.0)))
 
 
 ;; TODO INSTALL OPTINA FOR HYPERPARAMETER SEARCH
 
 (packages->manifest (list
 
-		     coreutils
-		     bash
-		     sed
-		     binutils
-		     direnv
+		     ;; coreutils
+		     ;; bash
+		     ;; sed
+		     ;; binutils
+		     ;; direnv
 		     
 		     python
 		     jupyter
-		     python-lsp-server
-		     python-lsp-black
-		     python-flake8
-		     python-pylsp-mypy
-		     python-pytest
-		     python-pytest-mypy
+		     ;; python-lsp-server
+		     ;; python-lsp-black
+		     ;; python-flake8
+		     ;; python-pylsp-mypy
+		     ;; python-pytest
+		     ;; python-pytest-mypy
+
 		     
-		     python-ott-jax
 		     
 		     python-numpy
 		     python-pandas
 		     python-matplotlib
 		     python-seaborn
 		     python-scikit-learn
-		     python-pytorch
-		     python-tensorflow
+
+		     ;; python-pytorch
+		     ;; python-tensorflow
+		     ;; python-ott-jax
+		     
 		     python-jax
 		     python-jaxtyping-three
 		     python-beartype
 		     python-equinox
-		     python-flax
+		     ;; python-flax
 		     python-optimistix
 		     python-diffrax
-		     python-waymax
-		     python-evosax
-		     python-databricks-sdk
-		     python-opentelemetry-api
-		     python-opentelemetry-semantic-conventions
-		     python-opentelemetry-sdk
+		     python-optax
+		     ;; python-waymax
+		     ;; python-evosax
+
+		     ;; python-databricks-sdk
+		     ;; python-opentelemetry-api
+		     ;; python-opentelemetry-semantic-conventions
+		     ;; python-opentelemetry-sdk
 		     
 		     ;; python-mlflow-wheel
 		     
-		     python-sqlparse
-		     python-tensorboard
-		     python-plotly
-		     python-distreqx
+		     ;; python-sqlparse
+		     ;; python-tensorboard
+		     ;; python-plotly
+		     ;; python-distreqx
+		     
 		     ))

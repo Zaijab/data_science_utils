@@ -8,7 +8,7 @@
   (url "https://codeberg.org/guix-science/guix-science.git")
   (branch "master")
   (commit
-   "bc3f3d3863c31969dc195d420a356f357db93ac7")
+   "414545462bd737959de6fa35ebd31196f60b0e59")
   (introduction
    (make-channel-introduction
     "b1fe5aaff3ab48e798a4cce02f0212bc91f423dc"
@@ -19,7 +19,7 @@
   (url "https://codeberg.org/guix-science/guix-science-nonfree.git")
   (branch "master")
   (commit
-   "18bc80bd6e640c4f89a48efbc4c153a886a7aa87")
+   "4e8cb56b02df1c9839efd96e5395d860a3442ea7")
   (introduction
    (make-channel-introduction
     "58661b110325fd5d9b40e6f0177cc486a615817e"
@@ -30,10 +30,13 @@
   (url "https://git.savannah.gnu.org/git/guix.git")
   (branch "master")
   (commit
-   "00291ad00ffddde1e557defaec3e9fde3f20cfaf")
+   "c3e5888180b29d6efc104fab198247276723259e")
   (introduction
    (make-channel-introduction
     "9edb3f66fd807b096b48283debdcddccfea34bad"
     (openpgp-fingerprint
-     "BBB0 2DDF 2CEA F6A8 0D1D  E643 A2A0 6DF2 A33A 54FA")))))
+     "BBB0 2DDF 2CEA F6A8 0D1D  E643 A2A0 6DF2 A33A 54FA"))))
+ #;(channel (name 'data-science-utils)
+	  (url ".")
+	  (branch "main")))
 

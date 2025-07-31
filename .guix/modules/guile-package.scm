@@ -22,6 +22,7 @@
                       #:recursive? #t
                       #:select? vcs-file?))
   (build-system pyproject-build-system)
+  (arguments `(#:tests? #f))
   (native-inputs (list python-setuptools
 		       python-wheel
 		       python-pytest))

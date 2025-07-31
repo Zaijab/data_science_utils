@@ -1,0 +1,5 @@
+[project]
+name = "data_science_utils"
+
+[tool.setuptools.packages.find]
+where = ["."]

@@ -1035,20 +1035,20 @@ setuptools.setup(
 		     
 		     python
 		     jupyter
-		     ;; python-lsp-server
-		     ;; python-lsp-black
-		     ;; python-flake8
-		     ;; python-pylsp-mypy
-		     ;; python-pytest
-		     ;; python-pytest-mypy
+		     python-lsp-server
+		     python-lsp-black
+		     python-flake8
+		     python-pylsp-mypy
+		     python-pytest
+		     python-pytest-mypy
 
 		     
 		     
-		     python-numpy
-		     python-pandas
-		     python-matplotlib
-		     python-seaborn
-		     python-scikit-learn
+		     ;; python-numpy
+		     ;; python-pandas
+		     ;; python-matplotlib
+		     ;; python-seaborn
+		     ;; python-scikit-learn
 
 		     ;; python-pytorch
 		     ;; python-tensorflow
